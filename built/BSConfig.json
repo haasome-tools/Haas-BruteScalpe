@@ -1,0 +1,1 @@
+{"DelayBTInMiliseconds":1000,"IPAddress":"127.0.0.1","Port":8096,"Secret":"SomeSecretHere","PrimarySecondaryCurrency":"BTC","MinutesToBackTest":1440,"Fee":0.1,"StartTargetPercentage":0.1,"EndTargetPrecentage":1.0,"StartSafteyPercentage":0.1,"EndSafteyPrecentage":1.0,"TargetPercentageStep":0.1,"SafteyPercentageStep":0.1,"MarketsToTest":["ETH","LTC"]}
