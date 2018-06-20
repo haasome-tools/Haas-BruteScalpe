@@ -29,6 +29,8 @@ namespace BruteScalpe
         public decimal TargetPercentageStep { get; set; } = 0.1m;
         public decimal SafteyPercentageStep { get; set; } = 0.1m;
 
+        public string AccountGUID { get; set; } = "ReplaceMeWithGuid";
+
         public HashSet<string> MarketsToTest { get; set; } = new HashSet<string>();
 
 
@@ -76,14 +78,22 @@ namespace BruteScalpe
 
         public static string GetWorkingAccountGUID()
         {
-            HaasonlineClient haasonlineClient = new HaasonlineClient(mainConfig.IPAddress, mainConfig.Port, mainConfig.Secret);
 
-            var accounts = haasonlineClient.AccountDataApi.GetEnabledAccounts();
-
-            // Quick hacky to get a key
-            foreach (string x in accounts.Result.Result.Keys)
+            if (mainConfig.AccountGUID.Equals("ReplaceMeWithGuid"))
             {
-                return x;
+                HaasonlineClient haasonlineClient = new HaasonlineClient(mainConfig.IPAddress, mainConfig.Port, mainConfig.Secret);
+
+                var accounts = haasonlineClient.AccountDataApi.GetEnabledAccounts();
+
+                Console.WriteLine("[!] Please Take Note Of The Account GUID And Add To Your Config");
+                // Quick hacky to get a key
+                foreach (string x in accounts.Result.Result.Keys)
+                {
+                    Console.WriteLine("[-] {0} : {1}", accounts.Result.Result[x], x);
+                }
+            } else
+            {
+                return mainConfig.AccountGUID;
             }
 
             return "";
@@ -126,91 +136,85 @@ namespace BruteScalpe
 
                     var workingAccountGUID = Program.GetWorkingAccountGUID();
 
-                    List<string> activeMarketsList = new List<string>();
-
-                    HaasonlineClient haasonlineClient = new HaasonlineClient(mainConfig.IPAddress, mainConfig.Port, mainConfig.Secret);
-
-                    var markets = haasonlineClient.MarketDataApi.GetPriceMarkets(Haasonline.Public.LocalApi.CSharp.Enums.EnumPriceSource.Binance);
-
-                    foreach (var market in markets.Result.Result)
+                    if (!workingAccountGUID.Equals(""))
                     {
-                        if (market.SecondaryCurrency.Equals(mainConfig.PrimarySecondaryCurrency))
+
+                        HaasonlineClient haasonlineClient = new HaasonlineClient(mainConfig.IPAddress, mainConfig.Port, mainConfig.Secret);
+
+                        Console.WriteLine("[*] Loaded {0} Markets To Brute Scalpe From Config File", mainConfig.MarketsToTest.Count);
+
+                        Console.WriteLine();
+                        Console.WriteLine("[S] Target Percentage Start:{0} End:{1} Step: {2}", mainConfig.StartTargetPercentage, mainConfig.EndTargetPrecentage, mainConfig.TargetPercentageStep);
+                        Console.WriteLine("[S] Saftey Percentage Start:{0} End:{1} Step: {2}", mainConfig.StartSafteyPercentage, mainConfig.EndSafteyPrecentage, mainConfig.TargetPercentageStep);
+
+                        Console.WriteLine();
+
+                        foreach (string market in mainConfig.MarketsToTest)
                         {
-                            activeMarketsList.Add(market.PrimaryCurrency);
-                        }
-                    }
+                            string botName = "BS-" + market + ":" + mainConfig.PrimarySecondaryCurrency;
 
-                    Console.WriteLine("[*] Loaded {0} Markets From Exchange Against Primary Secondary Currency {1}", activeMarketsList.Count, mainConfig.PrimarySecondaryCurrency);
-                    Console.WriteLine("[*] Loaded {0} Markets To Brute Scalpe From Config File", mainConfig.MarketsToTest.Count);
+                            var newBot = haasonlineClient.CustomBotApi.NewBot(Haasonline.Public.LocalApi.CSharp.Enums.EnumCustomBotType.ScalperBot, botName, workingAccountGUID, market, mainConfig.PrimarySecondaryCurrency, "");
+                            Thread.Sleep(1000);
+                            var allBots = haasonlineClient.CustomBotApi.GetAllBots();
 
-                    Console.WriteLine();
-                    Console.WriteLine("[S] Target Percentage Start:{0} End:{1} Step: {2}", mainConfig.StartTargetPercentage, mainConfig.EndTargetPrecentage, mainConfig.TargetPercentageStep);
-                    Console.WriteLine("[S] Saftey Percentage Start:{0} End:{1} Step: {2}", mainConfig.StartSafteyPercentage, mainConfig.EndSafteyPrecentage, mainConfig.TargetPercentageStep);
+                            Console.WriteLine("[*] Currently Testing: {0}:{1}", market, mainConfig.PrimarySecondaryCurrency);
 
-                    Console.WriteLine();
+                            decimal currentTargetPercentage = mainConfig.StartTargetPercentage;
+                            decimal currentSafteyPercentage = mainConfig.StartSafteyPercentage;
 
-                    foreach (string market in mainConfig.MarketsToTest)
-                    {
-                        string botName = "BS-" + market + ":" + mainConfig.PrimarySecondaryCurrency;
+                            int runEstimation = Convert.ToInt32((mainConfig.EndTargetPrecentage / mainConfig.TargetPercentageStep) * (mainConfig.EndSafteyPrecentage / mainConfig.SafteyPercentageStep));
 
-                        var newBot = haasonlineClient.CustomBotApi.NewBot(Haasonline.Public.LocalApi.CSharp.Enums.EnumCustomBotType.ScalperBot, botName, workingAccountGUID, market, mainConfig.PrimarySecondaryCurrency, "");
-                        Thread.Sleep(1000);
-                        var allBots = haasonlineClient.CustomBotApi.GetAllBots();
-
-                        Console.WriteLine("[*] Currently Testing: {0}:{1}", market, mainConfig.PrimarySecondaryCurrency);
-
-                        decimal currentTargetPercentage = mainConfig.StartTargetPercentage;
-                        decimal currentSafteyPercentage = mainConfig.StartSafteyPercentage;
-
-                        int runEstimation = Convert.ToInt32((mainConfig.EndTargetPrecentage / mainConfig.TargetPercentageStep) * (mainConfig.EndSafteyPrecentage / mainConfig.SafteyPercentageStep));
-
-                        // Find the Bot guid
-                        foreach (var bot in allBots.Result.Result)
-                        {
-
-                            decimal winningTargetPercentage = 0.0m;
-                            decimal winningSafteyPercentage = 0.0m;
-                            decimal winningROIValue = -1000.0m;
-
-                            int count = 0;
-
-                            if (bot.Name.Equals(botName))
+                            // Find the Bot guid
+                            foreach (var bot in allBots.Result.Result)
                             {
 
-                                while (currentTargetPercentage < mainConfig.EndTargetPrecentage)
+                                decimal winningTargetPercentage = 0.0m;
+                                decimal winningSafteyPercentage = 0.0m;
+                                decimal winningROIValue = -1000.0m;
+
+                                int count = 0;
+
+                                if (bot.Name.Equals(botName))
                                 {
-                                    while (currentSafteyPercentage < mainConfig.EndSafteyPrecentage)
+
+                                    while (currentTargetPercentage < mainConfig.EndTargetPrecentage)
                                     {
-                                        count++;
-
-                                        Console.Write("\r[+] Processing [{0} of {1}]", count, runEstimation);
-
-                                        var setupScalpBot = haasonlineClient.CustomBotApi.SetupScalpingBot(bot.GUID, bot.Name, workingAccountGUID, market, mainConfig.PrimarySecondaryCurrency, "", 0, 1000, mainConfig.Fee, mainConfig.PrimarySecondaryCurrency, "LOCKEDLIMIT", currentTargetPercentage, currentSafteyPercentage);
-                                        var backtestBot = haasonlineClient.CustomBotApi.BacktestBot<Haasonline.Public.LocalApi.CSharp.DataObjects.CustomBots.ScalperBot>(bot.GUID, mainConfig.MinutesToBackTest);
-                                        Thread.Sleep(mainConfig.DelayBTInMiliseconds);
-                                        var botResults = haasonlineClient.CustomBotApi.GetBot<Haasonline.Public.LocalApi.CSharp.DataObjects.CustomBots.ScalperBot>(bot.GUID);
-
-                                        if (botResults.Result.Result.ROI > winningROIValue)
+                                        while (currentSafteyPercentage < mainConfig.EndSafteyPrecentage)
                                         {
-                                            winningTargetPercentage = currentTargetPercentage;
-                                            winningSafteyPercentage = currentSafteyPercentage;
-                                            winningROIValue = botResults.Result.Result.ROI;
+                                            count++;
+
+                                            Console.Write("\r[+] Processing [{0} of {1}]", count, runEstimation);
+
+                                            var setupScalpBot = haasonlineClient.CustomBotApi.SetupScalpingBot(bot.GUID, bot.Name, workingAccountGUID, market, mainConfig.PrimarySecondaryCurrency, "", 0, 1000, mainConfig.Fee, mainConfig.PrimarySecondaryCurrency, "LOCKEDLIMIT", currentTargetPercentage, currentSafteyPercentage);
+                                            var backtestBot = haasonlineClient.CustomBotApi.BacktestBot<Haasonline.Public.LocalApi.CSharp.DataObjects.CustomBots.ScalperBot>(bot.GUID, mainConfig.MinutesToBackTest);
+                                            Thread.Sleep(mainConfig.DelayBTInMiliseconds);
+                                            var botResults = haasonlineClient.CustomBotApi.GetBot<Haasonline.Public.LocalApi.CSharp.DataObjects.CustomBots.ScalperBot>(bot.GUID);
+
+                                            if (botResults.Result.Result.ROI > winningROIValue)
+                                            {
+                                                winningTargetPercentage = currentTargetPercentage;
+                                                winningSafteyPercentage = currentSafteyPercentage;
+                                                winningROIValue = botResults.Result.Result.ROI;
+                                            }
+
+                                            currentSafteyPercentage = currentSafteyPercentage + mainConfig.SafteyPercentageStep;
                                         }
-
-                                        currentSafteyPercentage = currentSafteyPercentage + mainConfig.SafteyPercentageStep;
+                                        currentSafteyPercentage = mainConfig.StartSafteyPercentage;
+                                        currentTargetPercentage = currentTargetPercentage + mainConfig.TargetPercentageStep;
                                     }
-                                    currentSafteyPercentage = mainConfig.StartSafteyPercentage;
-                                    currentTargetPercentage = currentTargetPercentage + mainConfig.TargetPercentageStep;
+
+                                    var setupScalpBotComplete = haasonlineClient.CustomBotApi.SetupScalpingBot(bot.GUID, bot.Name, workingAccountGUID, market, mainConfig.PrimarySecondaryCurrency, "", 0, 1000, 0.1m, mainConfig.PrimarySecondaryCurrency, "LOCKEDLIMIT", winningTargetPercentage, winningSafteyPercentage);
+                                    var backtestBotComplete = haasonlineClient.CustomBotApi.BacktestBot<Haasonline.Public.LocalApi.CSharp.DataObjects.CustomBots.ScalperBot>(bot.GUID, mainConfig.MinutesToBackTest);
+
+                                    Console.WriteLine();
+                                    Console.WriteLine("[*] {0} - Target: {1} Saftey {2} ROI: {3:N4}%", botName, winningTargetPercentage, winningSafteyPercentage, winningROIValue);
+                                    Console.WriteLine();
                                 }
-
-                                var setupScalpBotComplete = haasonlineClient.CustomBotApi.SetupScalpingBot(bot.GUID, bot.Name, workingAccountGUID, market, mainConfig.PrimarySecondaryCurrency, "", 0, 1000, 0.1m, mainConfig.PrimarySecondaryCurrency, "LOCKEDLIMIT", winningTargetPercentage, winningSafteyPercentage);
-                                var backtestBotComplete = haasonlineClient.CustomBotApi.BacktestBot<Haasonline.Public.LocalApi.CSharp.DataObjects.CustomBots.ScalperBot>(bot.GUID, mainConfig.MinutesToBackTest);
-
-                                Console.WriteLine();
-                                Console.WriteLine("[*] {0} - Target: {1} Saftey {2} ROI: {3:N4}%", botName, winningTargetPercentage, winningSafteyPercentage, winningROIValue);
-                                Console.WriteLine();
                             }
                         }
+                    } else
+                    {
+                        Console.WriteLine("[!] Please Update Your Config File And Try Again");
                     }
                 }
                 else
@@ -220,7 +224,7 @@ namespace BruteScalpe
 
 
             }
-
+            Console.WriteLine("[***] Completed");
             Console.ReadLine();
         }
     }
