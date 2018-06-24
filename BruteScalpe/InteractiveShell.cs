@@ -40,7 +40,7 @@ namespace BruteScalp
             ActionManager.ShowConfig();
         }
 
-        [CmdCommand(Command ="set-config", Description = StaticStrings.SET_CONFIG_HELP_TEXT)]
+        [CmdCommand(Command = "set-config", Description = StaticStrings.SET_CONFIG_HELP_TEXT)]
         public void SetConfigCommand(string arg)
         {
             string[] arguments = Utils.SplitArgumentsSaftley(arg);
@@ -56,7 +56,8 @@ namespace BruteScalp
 
                     case "port":
                         int port_dead = 0;
-                        if (Int32.TryParse(arguments[1], out port_dead)) { 
+                        if (Int32.TryParse(arguments[1], out port_dead))
+                        {
                             ActionManager.SetConfigPort(Convert.ToInt32(arguments[1]));
                             Console.WriteLine("[*] Haas Port Set To {0}", arguments[1]);
                         }
@@ -251,7 +252,7 @@ namespace BruteScalp
 
             if (arguments.Length == 1)
             {
-                if(ActionManager.SaveConfig(arguments[0]))
+                if (ActionManager.SaveConfig(arguments[0]))
                 {
                     Console.WriteLine("[*] Saved Config With Filename {0}", arg[0]);
                 }
@@ -262,7 +263,7 @@ namespace BruteScalp
             }
             else
             {
-                if(ActionManager.SaveConfig())
+                if (ActionManager.SaveConfig())
                 {
                     Console.WriteLine("[*] Saved Default Config File {0}", ActionManager.DefaultConfigName);
                 }
@@ -280,10 +281,11 @@ namespace BruteScalp
 
             if (arguments.Length == 1)
             {
-                if(ActionManager.LoadConfig(arguments[0]))
+                if (ActionManager.LoadConfig(arguments[0]))
                 {
                     Console.WriteLine("[*] Loaded Config With Filename {0}", arg[0]);
-                } else
+                }
+                else
                 {
                     Console.WriteLine("[!] Could Not Load Config {0}", arg[0]);
                 }
@@ -324,14 +326,14 @@ namespace BruteScalp
 
             Console.WriteLine("\n---- Current Active Accounts ----");
 
-            foreach ( var account in ActionManager.GetAccountGUIDS())
+            foreach (var account in ActionManager.GetAccountGUIDS())
             {
                 Console.WriteLine("#{0} - {1} : {2}", count, account.Item1, account.Item2);
                 count++;
             }
 
             Console.WriteLine();
-            
+
         }
 
         [CmdCommand(Command = "set-account", Description = StaticStrings.SET_ACCOUNT_HELP_TEXT)]
@@ -347,15 +349,15 @@ namespace BruteScalp
                     int index = Convert.ToInt32(arguments[0]);
                     var accounts = ActionManager.GetAccountGUIDS();
 
-                    var accountPair = new Tuple<string, string>("","");
+                    var accountPair = new Tuple<string, string>("", "");
 
                     if (index > accounts.Count || index == 0)
                     {
                         Console.WriteLine("[!] Invalid Account Selection");
-                    } 
+                    }
                     else
-                    { 
-                        accountPair = ActionManager.GetAccountGUIDS()[Convert.ToInt32(arguments[0])-1];
+                    {
+                        accountPair = ActionManager.GetAccountGUIDS()[Convert.ToInt32(arguments[0]) - 1];
                         ActionManager.SetConfigAccountGuid(accountPair.Item2);
                         Console.WriteLine("[*] Haas Account Set To {0} : {1}", accountPair.Item1, accountPair.Item2);
                     }
@@ -390,7 +392,7 @@ namespace BruteScalp
                     Console.WriteLine("{0}/{1}", market.Item1, market.Item2);
                 }
             }
-            
+
         }
 
         [CmdCommand(Command = "add-test-market", Description = StaticStrings.ADD_TEST_MARKET_HELP_TEXT)]
@@ -402,7 +404,7 @@ namespace BruteScalp
 
             if (arguments.Length == 2)
             {
-                if(markets.FindIndex(s=>s.Item1.Equals(arguments[0].ToUpper()) == true && s.Item2.Equals(arguments[1].ToUpper()) == true) != -1)
+                if (markets.FindIndex(s => s.Item1.Equals(arguments[0].ToUpper()) == true && s.Item2.Equals(arguments[1].ToUpper()) == true) != -1)
                 {
                     ActionManager.AddMarketToTest(arguments[0].ToUpper(), arguments[1].ToUpper());
                     Console.WriteLine("[*] Market {0}/{1} Added To Test List", arguments[0].ToUpper(), arguments[1].ToUpper());
@@ -456,7 +458,7 @@ namespace BruteScalp
 
             foreach (var market in markets)
             {
-                Console.WriteLine("{0}/{1}", market.Item1, market.Item2);                
+                Console.WriteLine("{0}/{1}", market.Item1, market.Item2);
             }
 
             Console.WriteLine();
@@ -464,7 +466,7 @@ namespace BruteScalp
         }
 
         [CmdCommand(Command = "start", Description = StaticStrings.START_SCREENER_HELP_TEXT)]
-        public void StartScalpingCommand(string arg)
+        public async Task StartScalpingCommand(string arg)
         {
 
             Console.WriteLine("[*] Starting Brute Scalpe Process");
@@ -489,8 +491,7 @@ namespace BruteScalp
                 decimal winningSafetyPercentage = 0.0m;
                 decimal winningROIValue = -1000.0m;
 
-                int runEstimation = Convert.ToInt32((ActionManager.mainConfig.EndTargetPerecentage / ActionManager.mainConfig.TargetPercentageStep) * (ActionManager.mainConfig.EndSafetyPercentage / ActionManager.mainConfig.SafetyPercentageStep));
-
+                int runEstimation = Convert.ToInt32(((ActionManager.mainConfig.EndTargetPerecentage - ActionManager.mainConfig.StartTargetPercentage) / ActionManager.mainConfig.TargetPercentageStep) * ((ActionManager.mainConfig.EndSafetyPercentage - ActionManager.mainConfig.StartSafetyPercentage) / ActionManager.mainConfig.SafetyPercentageStep));
                 int count = 0;
 
                 foreach (var market in markets)
@@ -502,39 +503,16 @@ namespace BruteScalp
 
                     Console.WriteLine("[*] Testing Market: {0}/{1}", market.Item1, market.Item2);
 
-                    do
+                    var res = ActionManager.GrabMarketData(market.Item1, market.Item2);
+                    if (!res)
                     {
-                        ActionManager.GrabMarketData(market.Item1, market.Item2);
+                        Console.WriteLine($"[x] Skipping {market.Item1}/{market.Item2}. Failed to load history");
+                        continue;
+                    }
 
-                        // Sleep a fixed amount for first run to get data.
-                        Thread.Sleep(5000);
-
-                        bot = ActionManager.PerformBackTest(market.Item1, market.Item2, currentTargetPercentage, currentSafetyPercentage);
-
-                        if (!(index > markets.Count - 1))
-                        {
-                            if (index == markets.Count - 1)
-                            {
-                                ActionManager.GrabMarketData(markets[index].Item1, markets[index].Item2);
-                            }
-                            else
-                            {
-                                ActionManager.GrabMarketData(markets[index + 1].Item1, markets[index + 1].Item2);
-                            }
-                        }
-
-                        if (retryCount == ActionManager.mainConfig.RetryCount)
-                        {
-                            break;
-                        }
-
-                        retryCount++;
-
-
-                    } while (bot.ROI == 0);
+                    bot = ActionManager.PerformBackTest(market.Item1, market.Item2, currentTargetPercentage, currentSafetyPercentage);
 
                     backTestResults.Add(Utils.CreateBackTestResult(markets[index].Item1, markets[index].Item2, bot.ROI, currentTargetPercentage, currentSafetyPercentage));
-
 
                     while (currentTargetPercentage < ActionManager.mainConfig.EndTargetPerecentage)
                     {
@@ -627,7 +605,7 @@ namespace BruteScalp
 
         public override void PreLoop()
         {
-            if(ActionManager.PerformStartup())
+            if (ActionManager.PerformStartup())
             {
                 Console.WriteLine("[*] Succesfully Loaded Default Config {0} ", ActionManager.DefaultConfigName);
             }

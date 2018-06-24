@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Haasonline.LocalApi.CSharp.Enums;
 
 namespace BruteScalp
 {
@@ -279,16 +280,29 @@ namespace BruteScalp
             }
         }
 
-        public static void GrabMarketData(string market, string maincoin)
+        public static bool GrabMarketData(string market, string maincoin)
         {
             HaasonlineClient haasonlineClient = new HaasonlineClient(ActionManager.mainConfig.IPAddress, ActionManager.mainConfig.Port, ActionManager.mainConfig.Secret);
 
             AccountInformation accountInformation = haasonlineClient.AccountDataApi.GetAccountDetails(mainConfig.AccountGUID).Result.Result;
 
-            var task = Task.Run(async () => await haasonlineClient.MarketDataApi.GetHistory(accountInformation.ConnectedPriceSource, market, maincoin, "", 1, mainConfig.BackTestLength * 2));
+            var keepPolling = true;
+            var counter = 0;
+            while (keepPolling)
+            {
+                
+                var res = haasonlineClient.MarketDataApi.GetHistory(accountInformation.ConnectedPriceSource, market, maincoin, "", 1, mainConfig.BackTestLength * 2).Result;
+                if (res.ErrorCode == EnumErrorCode.Success && res.Result.Count >= mainConfig.BackTestLength)
+                    break;
 
-            task.Wait();
+                counter++;
+                if (counter > 30)
+                    return false;
 
+                Thread.Sleep(1000 * 2);
+            }
+
+            return true;
         }
 
         public static BaseCustomBot PerformBackTest(string market, string maincoin, decimal targetPercentage, decimal safetyPercentage)
@@ -297,7 +311,7 @@ namespace BruteScalp
             HaasonlineClient haasonlineClient = new HaasonlineClient(ActionManager.mainConfig.IPAddress, ActionManager.mainConfig.Port, ActionManager.mainConfig.Secret);
 
             var task = Task.Run(async () => await haasonlineClient.CustomBotApi.SetupScalpingBot(BaseBotTemplateGuid, "BruteScalpe-Template", ActionManager.mainConfig.AccountGUID, market,
-                maincoin, "", 0, 1000, ActionManager.mainConfig.Fee, maincoin, "LOCKEDLIMIT", targetPercentage, safetyPercentage));
+                maincoin, "", 0, 1000, ActionManager.mainConfig.Fee, maincoin, "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage));
 
             task.Wait();
                         
@@ -307,7 +321,6 @@ namespace BruteScalp
             task2.Wait();
 
             return task2.Result.Result;
-
         }
 
         public static void CreatePersistentBot(string market, string maincoin, decimal targetPercentage, decimal safetyPercentage)
