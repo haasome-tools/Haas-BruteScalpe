@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -8,6 +9,7 @@ namespace BruteScalp
 {
     class Utils
     {
+
         public static void ShowBanner()
         {
             Console.WriteLine("    ____             __      _____            __         ");
@@ -32,16 +34,45 @@ namespace BruteScalp
             return arguments;
         }
 
+        public static T DeepCopy<T>(T obj)
+        {
+            if (!typeof(T).IsSerializable)
+            {
+                throw new Exception("The source object must be serializable");
+            }
+
+            if (Object.ReferenceEquals(obj, null))
+            {
+                throw new Exception("The source object must not be null");
+            }
+
+            T result = default(T);
+
+            using (var memoryStream = new System.IO.MemoryStream())
+            {
+                var formatter = new BinaryFormatter();
+
+                formatter.Serialize(memoryStream, obj);
+                memoryStream.Seek(0, System.IO.SeekOrigin.Begin);
+                result = (T)formatter.Deserialize(memoryStream);
+                memoryStream.Close();
+
+            }
+            return result;
+        }
+
         public static BackTestResult CreateBackTestResult(string market, string maincoin, decimal ROI, decimal targetPercentage, decimal safetyPercentage)
         {
-            BackTestResult btResultI = new BackTestResult();
-            btResultI.AboveThreshold = (ROI >= ActionManager.mainConfig.KeepThreshold);
-            btResultI.Date = DateTime.Now;
-            btResultI.Fee = ActionManager.mainConfig.Fee;
-            btResultI.TargetPercentage = targetPercentage;
-            btResultI.SafetyPercentage = safetyPercentage;
-            btResultI.Pair = market + "/" + maincoin;
-            btResultI.ROI = ROI;
+            BackTestResult btResultI = new BackTestResult
+            {
+                AboveThreshold = (ROI >= ConfigManager.mainConfig.KeepThreshold),
+                Date = DateTime.Now,
+                Fee = ConfigManager.mainConfig.Fee,
+                TargetPercentage = targetPercentage,
+                SafetyPercentage = safetyPercentage,
+                Pair = market + "/" + maincoin,
+                ROI = ROI
+            };
 
             return btResultI;
         }

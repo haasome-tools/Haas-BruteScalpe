@@ -16,7 +16,5 @@ namespace BruteScalp
         public decimal ROI { get; set; }
         public bool AboveThreshold { get; set; }
 
-
-
     }
 }

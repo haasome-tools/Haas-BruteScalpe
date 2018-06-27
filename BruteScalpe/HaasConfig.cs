@@ -34,6 +34,11 @@ namespace BruteScalp
         public decimal EndSafetyPercentage { get; set; } = 1.0m;
         public decimal SafetyPercentageStep { get; set; } = 0.1m;
 
+        // Automation Settings
+        public decimal AmountOfCoinToUse { get; set; } = 0.1m;
+        public int TimeBeforeRetest { get; set; } = 5;
+        public decimal PercentageLossToDeactivate { get; set; } = 5m;
+
         public List<Tuple<string, string>> MarketsToTest { get; set; } = new List<Tuple<string, string>>();
 
     }
