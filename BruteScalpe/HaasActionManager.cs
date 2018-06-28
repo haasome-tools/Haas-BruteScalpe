@@ -7,6 +7,8 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Haasonline.LocalApi.CSharp.Enums;
+using Haasonline.Public.LocalApi.CSharp.DataObjects.MarketData;
+using Haasonline.Public.LocalApi.CSharp.Enums;
 
 namespace BruteScalp
 {
@@ -150,8 +152,6 @@ namespace BruteScalp
         public static BaseCustomBot GetCustomBotByName(string botName)
         {
 
-            List<BaseCustomBot> results = new List<BaseCustomBot>();
-
             if (HaasActionManager.CheckHaasConnection())
             {
                 // Find active bot markets
@@ -165,6 +165,43 @@ namespace BruteScalp
             }
 
             return null;
+        }
+
+        public static ScalperBot GetScalperBotByName(string botName)
+        {
+            List<BaseCustomBot> results = new List<BaseCustomBot>();
+
+            if (HaasActionManager.CheckHaasConnection())
+            {
+                // Find active bot markets
+                foreach (var bot in HaasActionManager.GetAllCustomBots())
+                {
+                    if (bot.Name.Equals(botName))
+                    {
+                        return HaasActionManager.RetrieveScalperObjectFromAPI(bot.GUID);
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        public static ScalperBot RetrieveScalperObjectFromAPI(string guid)
+        {
+            if (HaasActionManager.CheckHaasConnection())
+            {
+                HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
+
+                var getScalperBotTask = Task.Run(async () => await haasonlineClient.CustomBotApi.GetBot<ScalperBot>(guid));
+
+                getScalperBotTask.Wait();
+
+                return getScalperBotTask.Result.Result;
+            }
+            else
+            {
+                return null;
+            }
         }
 
         public static void ActivateCustomBot(string botGuid)
@@ -287,11 +324,17 @@ namespace BruteScalp
             decimal currentTargetPercentage = ConfigManager.mainConfig.StartTargetPercentage;
             decimal currentSafetyPercentage = ConfigManager.mainConfig.StartSafetyPercentage;
 
+            int runEstimation = Convert.ToInt32(((ConfigManager.mainConfig.EndTargetPerecentage - ConfigManager.mainConfig.StartTargetPercentage) / ConfigManager.mainConfig.TargetPercentageStep) * ((ConfigManager.mainConfig.EndSafetyPercentage - ConfigManager.mainConfig.StartSafetyPercentage) / ConfigManager.mainConfig.SafetyPercentageStep));
+
+
             while (currentTargetPercentage < ConfigManager.mainConfig.EndTargetPerecentage)
             {
                 while (currentSafetyPercentage < ConfigManager.mainConfig.EndSafetyPercentage)
                 {
                     count++;
+
+                    Console.Write("\r[+] Processing [{0} of {1}] - Target: {2} Safety: {3} ROI: {4}", count, runEstimation, currentTargetPercentage, currentSafetyPercentage, winningTrade.roi);
+
 
                     var botResults = HaasActionManager.PerformBackTest(primaryCurrency, secondaryCurrency, currentTargetPercentage, currentSafetyPercentage);
 
@@ -314,6 +357,8 @@ namespace BruteScalp
 
             }
 
+            Console.WriteLine();
+
             return winningTrade;
         }
 
@@ -329,14 +374,14 @@ namespace BruteScalp
 
             var setupScalpBotComplete = haasonlineClient.CustomBotApi.SetupScalpingBot(createBot.Result.Result.GUID, botName, 
                 ConfigManager.mainConfig.AccountGUID, market, maincoin,  "", 0, 1000, ConfigManager.mainConfig.Fee, maincoin,
-                "LOCKEDLIMIT", targetPercentage, safetyPercentage);
+                "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage);
 
             setupScalpBotComplete.Wait();
 
             Thread.Sleep(1000);
         }
 
-        public static void CreateAutoPersistentBot(string botName, string market, string maincoin, decimal targetPercentage, decimal safetyPercentage)
+        public static ScalperBot CreateAutoPersistentBot(string botName, string market, string maincoin, decimal amount,  decimal targetPercentage, decimal safetyPercentage)
         {
 
             HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
@@ -346,25 +391,91 @@ namespace BruteScalp
 
             createBot.Wait();
 
-            var setupScalpBotComplete = haasonlineClient.CustomBotApi.SetupScalpingBot(createBot.Result.Result.GUID, botName,
-                ConfigManager.mainConfig.AccountGUID, market, maincoin, "", 0, 1000, ConfigManager.mainConfig.Fee, maincoin,
-                "LOCKEDLIMIT", targetPercentage, safetyPercentage);
+            var setupScalpBotComplete = Task.Run(async () => await haasonlineClient.CustomBotApi.SetupScalpingBot(createBot.Result.Result.GUID, botName,
+                ConfigManager.mainConfig.AccountGUID, market, maincoin, "", 0, amount, ConfigManager.mainConfig.Fee, maincoin,
+                "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage));
 
             setupScalpBotComplete.Wait();
 
             Thread.Sleep(1000);
+
+            return setupScalpBotComplete.Result.Result;
         }
 
-        public static void UpdateScalperBot(string guid, string botName, string primaryCurrency, string secondaryCurrency, decimal targetPercentage, decimal safetyPercentage)
+        public static ScalperBot UpdateScalperBot(string guid, string botName, string primaryCurrency, string secondaryCurrency, string position, decimal amount ,  decimal targetPercentage, decimal safetyPercentage)
         {
-            int amount = 1000;
 
             HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
 
             var task = Task.Run(async () => await haasonlineClient.CustomBotApi.SetupScalpingBot(guid, botName, ConfigManager.mainConfig.AccountGUID, primaryCurrency,
-                secondaryCurrency, "", 0, amount, ConfigManager.mainConfig.Fee, secondaryCurrency, "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage));
+                secondaryCurrency, "", 0, amount, ConfigManager.mainConfig.Fee, position, "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage));
+
+            task.Wait();
+
+            return task.Result.Result;
         }
 
+        public static PriceTick GetOneMinutePriceDataForMarket(EnumPriceSource priceSource, string primaryCoin, string secondaryCoin)
+        {
+            if (HaasActionManager.CheckHaasConnection())
+            {
+
+                HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
+
+                var priceTickTask = Task.Run(async () => await haasonlineClient.MarketDataApi.GetMinutePriceTicker(priceSource, primaryCoin, secondaryCoin, ""));
+
+                priceTickTask.Wait();
+
+                return priceTickTask.Result.Result;
+
+            }
+
+            return null;
+        }
+
+        public static void MarketSellPosition(string primaryCoin, string secondaryCoin, decimal amount)
+        {
+            if (HaasActionManager.CheckHaasConnection())
+            {
+
+                HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
+
+                var priceTickTask = Task.Run(async () => await haasonlineClient.TradeApi.PlaceSpotSellOrder(ConfigManager.mainConfig.AccountGUID, primaryCoin, secondaryCoin, 0, amount));
+
+            }
+        }
+
+        public static void RemoveOpenOrder(string orderId)
+        {
+            if (HaasActionManager.CheckHaasConnection())
+            {
+
+                HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
+
+                var cancelOpenOrderCommand = Task.Run(async () => await haasonlineClient.TradeApi.CancelTemplate(orderId));
+
+            }
+        }
+
+        public static void Test()
+        {
+            if (HaasActionManager.CheckHaasConnection())
+            {
+
+                HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
+
+                var resultsTask = Task.Run(async () => await haasonlineClient.AccountDataApi.GetOrderTemplates());
+
+                resultsTask.Wait();
+
+                foreach(var result in resultsTask.Result.Result)
+                {
+                    Console.WriteLine("TEST: {0} - {1}", result.Key, result.Value);
+
+                }
+
+            }
+        }
 
         public static bool PerformStartup()
         {

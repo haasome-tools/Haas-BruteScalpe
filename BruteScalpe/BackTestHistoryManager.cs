@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Haasonline.Public.LocalApi.CSharp.DataObjects.CustomBots;
+using Haasonline.Public.LocalApi.CSharp.Enums;
 using Newtonsoft.Json;
 
 namespace BruteScalp
@@ -77,6 +78,37 @@ namespace BruteScalp
             }
 
             BackTestHistoryManager.AddHistoryEntry(accountGuid, baseCustomBot);
+        }
+
+        public static void AddHistoryEntry(string accountGuid, EnumPriceSource priceSource, string primaryCurrency, string secondaryCurrency, decimal roi)
+        {
+            BackTestData backTestData = new BackTestData();
+
+            backTestData.AccountGUID = accountGuid;
+            backTestData.Exchange = priceSource;
+            backTestData.PrimaryCurrency = primaryCurrency;
+            backTestData.SecondayCurrency = secondaryCurrency;
+            backTestData.WinningROI = roi;
+
+            BackTestHistoryManager.backTestHistory.history.Add(backTestData);
+        }
+
+        public static void UpdateHistoryEntry(string accountGuid, EnumPriceSource priceSource, string primaryCurrency, string secondaryCurrency, decimal roi)
+        {
+
+            foreach (var backTestEntry in BackTestHistoryManager.backTestHistory.history)
+            {
+                if (backTestEntry.AccountGUID.Equals(accountGuid) &&
+                    backTestEntry.PrimaryCurrency == primaryCurrency &&
+                    backTestEntry.SecondayCurrency == secondaryCurrency)
+                {
+                    BackTestHistoryManager.RemoveHistoryEntry(backTestEntry);
+                    BackTestHistoryManager.AddHistoryEntry(accountGuid, priceSource, primaryCurrency, secondaryCurrency, roi);
+                    return;
+                }
+            }
+
+            BackTestHistoryManager.AddHistoryEntry(accountGuid, priceSource, primaryCurrency, secondaryCurrency, roi);
 
         }
 

@@ -14,6 +14,8 @@ namespace BruteScalp
     class InteractiveShell : Cmd
     {
         private const string HistFileName = "ppscreener-cmd";
+        private static System.Timers.Timer autoScalpeTimer;
+        private bool autoStarted = false;
 
         [CmdCommand(Command = "exit", Description = StaticStrings.EXIT_HELP_TEXT)]
         public void ExitCommand(string arg)
@@ -566,7 +568,7 @@ namespace BruteScalp
                     }
 
                     Console.WriteLine();
-                    Console.WriteLine("[*] Winning {0} - Target: {1} Saftey {2} ROI: {3:N4}% - {4}", "BS-" + market.Item1 + ":" + market.Item2, winningTargetPercentage, winningSafetyPercentage, winningROIValue, details);
+                    Console.WriteLine("[*] Winning {0} - Target: {1} Saftey {2} ROI: {3}% - {4}", "BS-" + market.Item1 + ":" + market.Item2, winningTargetPercentage, winningSafetyPercentage, winningROIValue, details);
 
                     index++;
                 }
@@ -591,32 +593,39 @@ namespace BruteScalp
         public void StartAutoScalpe(string arg)
         {
 
-            Console.WriteLine("[*] Starting Auto Scalpe Process");
-            Console.WriteLine("[*] Performing Initial AutoScalpe Update");
-
-            ProcessAutoScalpeUpdate();
-
-            Console.WriteLine("[*] Scheduled ReOccuring Auto Retest To {0} Minutes", TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBeforeRetest));
-
-            var timer = new System.Threading.Timer((e) =>
+            if (!autoStarted)
             {
-                ProcessAutoScalpeUpdate();
+                Console.WriteLine("[*] Starting Auto Scalpe Process");
+                Console.WriteLine("[*] Performing Initial AutoScalpe Update");
 
-            }, null, TimeSpan.Zero, TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBeforeRetest));
+                //ProcessAutoScalpeUpdate();
+
+                //Console.WriteLine("[*] Scheduled Reoccuring Auto Retest To {0} Minutes", TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBeforeRetest));
+                Console.WriteLine("[*] Scheduled Reoccuring Auto Retest To {0} Minutes", TimeSpan.FromMilliseconds(20000));
+
+                autoScalpeTimer = new System.Timers.Timer(Convert.ToInt32(TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBeforeRetest).TotalMilliseconds / 3));
+                autoScalpeTimer.Elapsed += async (sender, e) => await ProcessAutoScalpeUpdate();
+
+                autoScalpeTimer.Start();
+
+                autoStarted = true;
+            }
+            else
+            {
+                Console.WriteLine("[*] Auto Scalpe Already Running");
+            }
         }
 
         [CmdCommand(Command = "test", Description = StaticStrings.START_SCREENER_HELP_TEXT)]
         public void Test(string arg)
         {
-
-            foreach(var market in AutoScalpeManager.GetMarketsPrioritized())
-            {
-                Console.WriteLine("{0}/{1}", market.Item1, market.Item2);
-            }
+            HaasActionManager.Test();
         }
 
-        public void ProcessAutoScalpeUpdate()
+        public Task<string> ProcessAutoScalpeUpdate()
         {
+            Console.WriteLine();
+
             string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
 
             string botNamePrefixToMatch = "BS-" + accountGuidSplit[0];
@@ -624,6 +633,8 @@ namespace BruteScalp
             var markets = AutoScalpeManager.GetMarketsPrioritized();
 
             var customBots = HaasActionManager.GetAllCustomBotsWithPrefix(botNamePrefixToMatch);
+
+            var accountInfo = HaasActionManager.GetAccountInformation();
 
             var history = BackTestHistoryManager.GetHistoryForAccount(ConfigManager.mainConfig.AccountGUID);
 
@@ -642,7 +653,7 @@ namespace BruteScalp
 
                     string botName = "BS-" + accountGuidSplit[0] + "-" + market.Item1 + ":" + market.Item2;
 
-                    Console.WriteLine("[*] AutoManagement - Testing Market: {0}/{1}", market.Item1, market.Item2);
+                    Console.WriteLine("[*] Auto Management - Testing Market: {0}/{1}", market.Item1, market.Item2);
 
                     var res = HaasActionManager.GrabMarketData(market.Item1, market.Item2);
 
@@ -658,9 +669,11 @@ namespace BruteScalp
                     if (winningTrade.roi >= ConfigManager.mainConfig.KeepThreshold)
                     {
                         var btData = AutoScalpeManager.GetHistoryForMarket(ConfigManager.mainConfig.AccountGUID, history, market);
-                        
+
+                        Console.WriteLine("[*] Auto Management - Market Backtest Above Set Keep Threshold");
+
                         // Check to see if we have preexisting history
-                        if(btData != null)
+                        if (btData != null)
                         {
                             // History we need to check if its higher than current winning roi
                             if(winningTrade.roi > btData.WinningROI)
@@ -668,40 +681,161 @@ namespace BruteScalp
 
                                 var customBot = HaasActionManager.GetCustomBotByName(botName);
 
-                                // New ROI larger than last ROI
-                                // Need to stop bot and update settings then start
-                                HaasActionManager.DeactivateCustomBot(customBot.GUID);
-                                HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, winningTrade.targetPercentage, winningTrade.safetyPercentage);
-                                HaasActionManager.ActivateCustomBot(customBot.GUID);
+                                if (customBot != null)
+                                {
+                                    // New ROI larger than last ROI
+
+                                    Console.WriteLine("[*] Auto Management - Better Settings Found For {0}", botName);
+
+                                    // Need to stop bot and update settings then start
+                                    HaasActionManager.DeactivateCustomBot(customBot.GUID);
+
+                                    Console.WriteLine("[*] Auto Management - Deactivate Bot {0}", botName);
+
+                                    // Position of bot
+                                    string currentPosition = "";
+
+                                    if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                                    {
+                                        currentPosition = customBot.PriceMarket.PrimaryCurrency;
+                                    }
+                                    else
+                                    {
+                                        currentPosition = customBot.PriceMarket.SecondaryCurrency;
+                                    }
+
+                                    var updatedBot = HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, currentPosition, customBot.CurrentTradeAmount, winningTrade.targetPercentage, winningTrade.safetyPercentage);
+
+                                    Console.WriteLine("[*] Auto Management - Updated Settings Found For {0}", botName);
+
+                                    HaasActionManager.ActivateCustomBot(customBot.GUID);
+
+                                    Console.WriteLine("[*] Auto Management - Reactivated Bot {0}", botName);
+
+                                    BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, updatedBot);
+                                }
+                                else
+                                {
+
+                                    Console.WriteLine("[*] Auto Management - Creating New Scalper Bot {0}", botName);
+
+                                    var priceTicker = HaasActionManager.GetOneMinutePriceDataForMarket(accountInfo.ConnectedPriceSource, market.Item1, market.Item2);
+
+                                    var amount = ConfigManager.mainConfig.AmountOfCoinToUse / priceTicker.Close;
+
+                                    // No History create bot
+                                    var newBot = HaasActionManager.CreateAutoPersistentBot(botName, market.Item1, market.Item2, Math.Round(amount), winningTrade.targetPercentage, winningTrade.safetyPercentage);
+
+                                    HaasActionManager.ActivateCustomBot(newBot.GUID);
+
+                                    Console.WriteLine("[*] Auto Management - Activated Bot {0}", botName);
+                                }
+
+                            }
+                            else
+                            {
+                                Console.WriteLine("[*] Auto Management - Bot {0} Settings The Same Or Better - Ignorning", botName);
                             }
 
                         }
                         else
                         {
-                            // No History create bot
-                            HaasActionManager.CreateAutoPersistentBot(botName, market.Item1, market.Item2, winningTrade.targetPercentage, winningTrade.safetyPercentage);
-                        }
 
+                            Console.WriteLine("[*] Auto Management - Creating New Scalper Bot {0}", botName);
+
+                            var priceTicker = HaasActionManager.GetOneMinutePriceDataForMarket(accountInfo.ConnectedPriceSource, market.Item1, market.Item2);
+
+                            var amount = ConfigManager.mainConfig.AmountOfCoinToUse / priceTicker.Close;
+
+                            // No History create bot
+                            var newBot = HaasActionManager.CreateAutoPersistentBot(botName, market.Item1, market.Item2, Math.Round(amount), winningTrade.targetPercentage, winningTrade.safetyPercentage);
+
+                            HaasActionManager.ActivateCustomBot(newBot.GUID);
+
+                            Console.WriteLine("[*] Auto Management - Activated Bot {0}", botName);
+                        }
                     }
                     else
                     {
-                        var btData = AutoScalpeManager.GetHistoryForMarket(ConfigManager.mainConfig.AccountGUID, history, market);
-
-                        // Check to see if we have preexisting history
-                        if (btData != null)
+                        if (winningTrade.roi < 0)
                         {
-                            // We need to check if the losing roi can cover the current bots roi. If so we leave it running if not we stop the bot
+                            var customBot = HaasActionManager.GetScalperBotByName(botName);
 
+                            if (customBot.Activated)
+                            {
+                                if (customBot != null)
+                                {
+                                    // We need to check if the losing roi can cover the current bots roi. If so we leave it running if not we stop the bot
+                                    if ((customBot.ROI + winningTrade.roi) > 0.0m)
+                                    {
+                                        // We Ignore and leave bot running
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine("[*] Auto Management - Deactivating Bot {0} Due To Past Market Test", botName);
+
+                                        // We Need To Stop The Bot And Check To Sell Position
+                                        HaasActionManager.DeactivateCustomBot(customBot.GUID);
+
+                                        // Remove any open orders the bot might have
+                                        HaasActionManager.RemoveOpenOrder(customBot.OpenOrderId);
+
+                                        // Reset Position of bot
+                                        string currentPosition = "";
+
+                                        // If we should sell and reset the bots position when deactivated
+                                        if (ConfigManager.mainConfig.SellPositionWhenBotDeactivates)
+                                        {
+                                            if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                                            {
+                                                currentPosition = customBot.PriceMarket.SecondaryCurrency;
+
+                                                Console.WriteLine("[*] Auto Management - Placing Market Sell For Bot {0} Position", botName);
+
+                                                // Sell the position using market.
+                                                HaasActionManager.MarketSellPosition(market.Item1, market.Item2, customBot.CurrentTradeAmount);
+
+                                            }
+
+                                            Console.WriteLine("[*] Auto Management - Bot {0} Reset", botName);
+
+                                            // Update the position of the bot
+                                            HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, currentPosition, customBot.CurrentTradeAmount, customBot.MinimumTargetChange, customBot.MaxAllowedReverseChange);
+                                            
+                                        }
+
+                                        // Just deactivate
+                                        if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                                        {
+                                            currentPosition = customBot.PriceMarket.PrimaryCurrency;
+                                        }
+                                        else
+                                        {
+                                            currentPosition = customBot.PriceMarket.SecondaryCurrency;
+                                        }
+
+                                        HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, currentPosition, customBot.CurrentTradeAmount, customBot.MinimumTargetChange, customBot.MaxAllowedReverseChange);
+                                    }
+                                }
+                            }
                         }
-
                     }
-                    
 
-                    Console.WriteLine();
-                    //Console.WriteLine("[*] Winning {0} - Target: {1} Saftey {2} ROI: {3:N4}% - {4}", "BS-" + market.Item1 + ":" + market.Item2, winningTargetPercentage, winningSafetyPercentage, winningROIValue, details);
+                    BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, market.Item1, market.Item2, winningTrade.roi);
+
+                    Console.WriteLine("[*] Auto Management - Winning {0} - Target: {1} Saftey {2} ROI: {3:N4}%", "BS-" + market.Item1 + ":" + market.Item2, winningTrade.targetPercentage, winningTrade.safetyPercentage, winningTrade.roi);
+                    
                 }
 
+                Console.WriteLine("[*] Auto Management - Auto Retest Complete");
+
+                BackTestHistoryManager.SaveBackTestHistory();
+
+                HaasActionManager.DeleteTemplateBot();
+
             }
+
+            return Task.FromResult(string.Empty);
         }
 
         public InteractiveShell()
