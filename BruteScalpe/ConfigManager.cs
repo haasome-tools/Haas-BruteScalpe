@@ -178,5 +178,30 @@ namespace BruteScalp
         {
             ConfigManager.mainConfig.MarketsToTest.Remove(new Tuple<string, string>(market, maincoin));
         }
+
+        public static void SetMinutesBeforeAutoScalpeRetest(int timeInMinutes)
+        {
+            ConfigManager.mainConfig.MinutesBeforeAutoScalpeRetest = timeInMinutes;
+        }
+
+        public static void SetAmountOfCurrencyForAutoScalpeToUse(decimal coinAmount)
+        {
+            ConfigManager.mainConfig.AmountOfCurrencyForAutoScalpeToUse = coinAmount;
+        }
+
+        public static void SetTimeBetweenGlobalSafetyCheck(int timeCheck)
+        {
+            ConfigManager.mainConfig.TimeBetweenGlobalSafetyCheck = timeCheck;
+        }
+
+        public static void SetGlobalPercentageLossToDeactivate(decimal percentageLoss)
+        {
+            ConfigManager.mainConfig.GlobalPercentageLossToDeactivate = percentageLoss;
+        }
+
+        public static void SetSellPositionWhenBotDeactivates(bool toSell)
+        {
+            ConfigManager.mainConfig.SellPositionWhenBotDeactivates = toSell;
+        }
     }
 }

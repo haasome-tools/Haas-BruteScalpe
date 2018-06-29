@@ -15,7 +15,10 @@ namespace BruteScalp
     {
         private const string HistFileName = "ppscreener-cmd";
         private static System.Timers.Timer autoScalpeTimer;
+        private static System.Timers.Timer autoSafety;
+
         private bool autoStarted = false;
+        private bool autoSafetyStarted = false;
 
         [CmdCommand(Command = "exit", Description = StaticStrings.EXIT_HELP_TEXT)]
         public void ExitCommand(string arg)
@@ -230,6 +233,64 @@ namespace BruteScalp
                         {
                             Console.WriteLine("[!] Argument Is Not A Decimal");
                         }
+                        break;
+
+                    case "minutesbeforeautoscalperetest":
+                        int timebeforeretest_dead = 0;
+                        if (Int32.TryParse(arguments[1], out timebeforeretest_dead))
+                        {
+                            ConfigManager.SetMinutesBeforeAutoScalpeRetest(Convert.ToInt32(arguments[1]));
+                            Console.WriteLine("[*] Time Before Retest Count Set To {0}", arguments[1]);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[!] Argument Is Not A Number");
+                        }
+                        break;
+
+                    case "autoscalpecurrencyuse":
+                        decimal amountofcurrencyforautoscalpetouse_dead = 0;
+                        if (Decimal.TryParse(arguments[1], out amountofcurrencyforautoscalpetouse_dead))
+                        {
+                            ConfigManager.SetAmountOfCurrencyForAutoScalpeToUse(Convert.ToDecimal(arguments[1]));
+                            Console.WriteLine("[*] Amount Of Currency For Auto Scalpe To Use Set To {0}", arguments[1]);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[!] Argument Is Not A Number");
+                        }
+                        break;
+
+                    case "timeglobalcheck":
+                        int timeglobalcheck_dead = 0;
+                        if (Int32.TryParse(arguments[1], out timeglobalcheck_dead))
+                        {
+                            ConfigManager.SetTimeBetweenGlobalSafetyCheck(Convert.ToInt32(arguments[1]));
+                            Console.WriteLine("[*] Time Between Global Safety Check Set To {0}", arguments[1]);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[!] Argument Is Not A Number");
+                        }
+                        break;
+
+                    case "globalpercentagesafety":
+                        decimal globalpercentagesafety_dead = 0;
+                        if (Decimal.TryParse(arguments[1], out globalpercentagesafety_dead))
+                        {
+                            ConfigManager.SetGlobalPercentageLossToDeactivate(Convert.ToDecimal(arguments[1]));
+                            Console.WriteLine("[*] Global Percentage Loss To Deactivate Set To {0}", arguments[1]);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[!] Argument Is Not A Number");
+                        }
+                        break;
+
+                    case "sellwhenbotdeactivates":
+                        ConfigManager.SetSellPositionWhenBotDeactivates(Convert.ToBoolean(arguments[1]));
+                        Console.WriteLine("[*] Global Percentage Loss To Deactivate Set To {0}", Convert.ToBoolean(arguments[1]));
+ 
                         break;
 
                     default:
@@ -590,7 +651,7 @@ namespace BruteScalp
         }
 
         [CmdCommand(Command = "start-auto-scalpe", Description = StaticStrings.START_SCREENER_HELP_TEXT)]
-        public void StartAutoScalpe(string arg)
+        public void StartAutoScalpeCommand(string arg)
         {
 
             if (!autoStarted)
@@ -598,12 +659,9 @@ namespace BruteScalp
                 Console.WriteLine("[*] Starting Auto Scalpe Process");
                 Console.WriteLine("[*] Performing Initial AutoScalpe Update");
 
-                //ProcessAutoScalpeUpdate();
+                Console.WriteLine("[*] Scheduled Reoccuring Auto Retest To {0} Minutes", TimeSpan.FromMinutes(ConfigManager.mainConfig.MinutesBeforeAutoScalpeRetest));
 
-                //Console.WriteLine("[*] Scheduled Reoccuring Auto Retest To {0} Minutes", TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBeforeRetest));
-                Console.WriteLine("[*] Scheduled Reoccuring Auto Retest To {0} Minutes", TimeSpan.FromMilliseconds(20000));
-
-                autoScalpeTimer = new System.Timers.Timer(Convert.ToInt32(TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBeforeRetest).TotalMilliseconds / 3));
+                autoScalpeTimer = new System.Timers.Timer(Convert.ToInt32(TimeSpan.FromMinutes(ConfigManager.mainConfig.MinutesBeforeAutoScalpeRetest).TotalMilliseconds));
                 autoScalpeTimer.Elapsed += async (sender, e) => await ProcessAutoScalpeUpdate();
 
                 autoScalpeTimer.Start();
@@ -616,10 +674,26 @@ namespace BruteScalp
             }
         }
 
-        [CmdCommand(Command = "test", Description = StaticStrings.START_SCREENER_HELP_TEXT)]
-        public void Test(string arg)
+        [CmdCommand(Command = "start-auto-safety", Description = StaticStrings.START_SCREENER_HELP_TEXT)]
+        public void StartAutoSafetyCommand(string arg)
         {
-            HaasActionManager.Test();
+            if (!autoSafetyStarted)
+            {
+                Console.WriteLine("[*] Starting Auto Safety Process");
+
+                Console.WriteLine("[*] Scheduled Reoccuring Auto Saftey Test To {0} Minutes", TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBetweenGlobalSafetyCheck));
+
+                autoSafety = new System.Timers.Timer(Convert.ToInt32(TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBetweenGlobalSafetyCheck).TotalMilliseconds));
+                autoSafety.Elapsed += async (sender, e) => await ProcessAutoSafetyUpdate();
+
+                autoSafety.Start();
+
+                autoSafetyStarted = true;
+            }
+            else
+            {
+                Console.WriteLine("[*] Auto Safety Already Running");
+            }
         }
 
         public Task<string> ProcessAutoScalpeUpdate()
@@ -721,7 +795,7 @@ namespace BruteScalp
 
                                     var priceTicker = HaasActionManager.GetOneMinutePriceDataForMarket(accountInfo.ConnectedPriceSource, market.Item1, market.Item2);
 
-                                    var amount = ConfigManager.mainConfig.AmountOfCoinToUse / priceTicker.Close;
+                                    var amount = ConfigManager.mainConfig.AmountOfCurrencyForAutoScalpeToUse / priceTicker.Close;
 
                                     // No History create bot
                                     var newBot = HaasActionManager.CreateAutoPersistentBot(botName, market.Item1, market.Item2, Math.Round(amount), winningTrade.targetPercentage, winningTrade.safetyPercentage);
@@ -745,7 +819,7 @@ namespace BruteScalp
 
                             var priceTicker = HaasActionManager.GetOneMinutePriceDataForMarket(accountInfo.ConnectedPriceSource, market.Item1, market.Item2);
 
-                            var amount = ConfigManager.mainConfig.AmountOfCoinToUse / priceTicker.Close;
+                            var amount = ConfigManager.mainConfig.AmountOfCurrencyForAutoScalpeToUse / priceTicker.Close;
 
                             // No History create bot
                             var newBot = HaasActionManager.CreateAutoPersistentBot(botName, market.Item1, market.Item2, Math.Round(amount), winningTrade.targetPercentage, winningTrade.safetyPercentage);
@@ -833,6 +907,76 @@ namespace BruteScalp
 
                 HaasActionManager.DeleteTemplateBot();
 
+            }
+
+            return Task.FromResult(string.Empty);
+        }
+
+        public Task<string> ProcessAutoSafetyUpdate()
+        {
+
+            string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
+
+            string botNamePrefixToMatch = "BS-" + accountGuidSplit[0];
+
+            var customBots = HaasActionManager.GetAllCustomBotsWithPrefix(botNamePrefixToMatch);
+
+            Console.WriteLine("[*] Auto Management - Processing Auto Safety Test");
+
+            foreach (var customBot in customBots)
+            {
+                if(customBot.ROI < ConfigManager.mainConfig.GlobalPercentageLossToDeactivate)
+                {
+                    Console.WriteLine("[*] Auto Management - Deactivating Bot {0} Due To Auto Safety Check", customBot.Name);
+
+                    // We Need To Stop The Bot And Check To Sell Position
+                    HaasActionManager.DeactivateCustomBot(customBot.GUID);
+
+                    // Remove any open orders the bot might have
+                    HaasActionManager.RemoveOpenOrder(customBot.OpenOrderId);
+
+                    var scalperBot = HaasActionManager.GetScalperBotByName(customBot.Name);
+
+                    // Reset Position of bot
+                    string currentPosition = "";
+
+                    // If we should sell and reset the bots position when deactivated
+                    if (ConfigManager.mainConfig.SellPositionWhenBotDeactivates)
+                    {
+                        if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                        {
+                            currentPosition = customBot.PriceMarket.SecondaryCurrency;
+
+                            Console.WriteLine("[*] Auto Management - Placing Market Sell For Bot {0} Position", customBot.Name);
+
+                            // Sell the position using market.
+                            HaasActionManager.MarketSellPosition(customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, customBot.CurrentTradeAmount);
+
+                        }
+
+                        Console.WriteLine("[*] Auto Management - Bot {0} Reset", customBot.Name);
+
+                        // Update the position of the bot
+                        HaasActionManager.UpdateScalperBot(customBot.GUID, customBot.Name, customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, currentPosition, customBot.CurrentTradeAmount, scalperBot.MinimumTargetChange, scalperBot.MaxAllowedReverseChange);
+
+                    }
+
+                    // Just deactivate
+                    if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                    {
+                        currentPosition = customBot.PriceMarket.PrimaryCurrency;
+                    }
+                    else
+                    {
+                        currentPosition = customBot.PriceMarket.SecondaryCurrency;
+                    }
+
+                    HaasActionManager.UpdateScalperBot(customBot.GUID, customBot.Name, customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, currentPosition, customBot.CurrentTradeAmount, scalperBot.MinimumTargetChange, scalperBot.MaxAllowedReverseChange);
+
+                    var backTestData = BackTestHistoryManager.GetHistoryForBot(customBot);
+
+                    BackTestHistoryManager.RemoveHistoryEntry(backTestData);
+                }
             }
 
             return Task.FromResult(string.Empty);
