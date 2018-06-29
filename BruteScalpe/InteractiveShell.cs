@@ -976,65 +976,67 @@ namespace BruteScalp
             {
                 try
                 {
+                    if(customBot.Activated) {
+                        
+                        var backTestHistory = BackTestHistoryManager.GetHistoryForBot(customBot);
 
-                    var backTestHistory = BackTestHistoryManager.GetHistoryForBot(customBot);
-
-                    if (backTestHistory != null)
-                    {
-                        activationRoi = backTestHistory.ActivationROI;
-                    }
-
-                    if (customBot.ROI < (activationRoi + (-ConfigManager.mainConfig.GlobalPercentageLossToDeactivate)))
-                    {
-                        Console.WriteLine("[*] Auto Management - Deactivating Bot {0} Due To Auto Safety Check", customBot.Name);
-
-                        // We Need To Stop The Bot And Check To Sell Position
-                        HaasActionManager.DeactivateCustomBot(customBot.GUID);
-
-                        // Remove any open orders the bot might have
-                        HaasActionManager.RemoveOpenOrder(customBot.OpenOrderId);
-
-                        var scalperBot = HaasActionManager.GetScalperBotByName(customBot.Name);
-
-                        // Reset Position of bot
-                        string currentPosition = "";
-
-                        // If we should sell and reset the bots position when deactivated
-                        if (ConfigManager.mainConfig.SellPositionWhenBotDeactivates)
+                        if (backTestHistory != null)
                         {
-                            if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                            activationRoi = backTestHistory.ActivationROI;
+                        }
+
+                        if (customBot.ROI < (activationRoi + (-ConfigManager.mainConfig.GlobalPercentageLossToDeactivate)))
+                        {
+                            Console.WriteLine("[*] Auto Management - Deactivating Bot {0} Due To Auto Safety Check", customBot.Name);
+
+                            // We Need To Stop The Bot And Check To Sell Position
+                            HaasActionManager.DeactivateCustomBot(customBot.GUID);
+
+                            // Remove any open orders the bot might have
+                            HaasActionManager.RemoveOpenOrder(customBot.OpenOrderId);
+
+                            var scalperBot = HaasActionManager.GetScalperBotByName(customBot.Name);
+
+                            // Reset Position of bot
+                            string currentPosition = "";
+
+                            // If we should sell and reset the bots position when deactivated
+                            if (ConfigManager.mainConfig.SellPositionWhenBotDeactivates)
                             {
-                                currentPosition = customBot.PriceMarket.SecondaryCurrency;
+                                if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                                {
+                                    currentPosition = customBot.PriceMarket.SecondaryCurrency;
 
-                                Console.WriteLine("[*] Auto Management - Placing Market Sell For Bot {0} Position", customBot.Name);
+                                    Console.WriteLine("[*] Auto Management - Placing Market Sell For Bot {0} Position", customBot.Name);
 
-                                // Sell the position using market.
-                                HaasActionManager.MarketSellPosition(customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, customBot.CurrentTradeAmount);
+                                    // Sell the position using market.
+                                    HaasActionManager.MarketSellPosition(customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, customBot.CurrentTradeAmount);
+
+                                }
+
+                                Console.WriteLine("[*] Auto Management - Bot {0} Reset", customBot.Name);
+
+                                // Update the position of the bot
+                                HaasActionManager.UpdateScalperBot(customBot.GUID, customBot.Name, customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, currentPosition, customBot.CurrentTradeAmount, scalperBot.MinimumTargetChange, scalperBot.MaxAllowedReverseChange);
 
                             }
 
-                            Console.WriteLine("[*] Auto Management - Bot {0} Reset", customBot.Name);
+                            // Just deactivate
+                            if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                            {
+                                currentPosition = customBot.PriceMarket.PrimaryCurrency;
+                            }
+                            else
+                            {
+                                currentPosition = customBot.PriceMarket.SecondaryCurrency;
+                            }
 
-                            // Update the position of the bot
                             HaasActionManager.UpdateScalperBot(customBot.GUID, customBot.Name, customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, currentPosition, customBot.CurrentTradeAmount, scalperBot.MinimumTargetChange, scalperBot.MaxAllowedReverseChange);
 
+                            var backTestData = BackTestHistoryManager.GetHistoryForBot(customBot);
+
+                            BackTestHistoryManager.RemoveHistoryEntry(backTestData);
                         }
-
-                        // Just deactivate
-                        if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
-                        {
-                            currentPosition = customBot.PriceMarket.PrimaryCurrency;
-                        }
-                        else
-                        {
-                            currentPosition = customBot.PriceMarket.SecondaryCurrency;
-                        }
-
-                        HaasActionManager.UpdateScalperBot(customBot.GUID, customBot.Name, customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, currentPosition, customBot.CurrentTradeAmount, scalperBot.MinimumTargetChange, scalperBot.MaxAllowedReverseChange);
-
-                        var backTestData = BackTestHistoryManager.GetHistoryForBot(customBot);
-
-                        BackTestHistoryManager.RemoveHistoryEntry(backTestData);
                     }
                 }
                 catch (Exception e)
