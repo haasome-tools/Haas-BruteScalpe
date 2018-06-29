@@ -659,6 +659,8 @@ namespace BruteScalp
                 Console.WriteLine("[*] Starting Auto Scalpe Process");
                 Console.WriteLine("[*] Performing Initial AutoScalpe Update");
 
+                ProcessAutoScalpeUpdate();
+
                 Console.WriteLine("[*] Scheduled Reoccuring Auto Retest To {0} Minutes", TimeSpan.FromMinutes(ConfigManager.mainConfig.MinutesBeforeAutoScalpeRetest));
 
                 autoScalpeTimer = new System.Timers.Timer(Convert.ToInt32(TimeSpan.FromMinutes(ConfigManager.mainConfig.MinutesBeforeAutoScalpeRetest).TotalMilliseconds));
@@ -925,7 +927,7 @@ namespace BruteScalp
 
             foreach (var customBot in customBots)
             {
-                if(customBot.ROI < ConfigManager.mainConfig.GlobalPercentageLossToDeactivate)
+                if(customBot.ROI < (-ConfigManager.mainConfig.GlobalPercentageLossToDeactivate))
                 {
                     Console.WriteLine("[*] Auto Management - Deactivating Bot {0} Due To Auto Safety Check", customBot.Name);
 

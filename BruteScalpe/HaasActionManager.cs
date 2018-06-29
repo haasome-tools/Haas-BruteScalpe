@@ -21,16 +21,24 @@ namespace BruteScalp
 
         public static bool CheckHaasConnection()
         {
-            HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
-
-            var accounts = haasonlineClient.AccountDataApi.GetEnabledAccounts();
-
-            if (accounts.Result.ErrorCode == Haasonline.LocalApi.CSharp.Enums.EnumErrorCode.Success)
+            try
             {
-                if (HaasActionManager.GetAccountGUIDS().Count > 0)
+                HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
+
+
+                var accounts = haasonlineClient.AccountDataApi.GetEnabledAccounts();
+
+                if (accounts.Result.ErrorCode == Haasonline.LocalApi.CSharp.Enums.EnumErrorCode.Success)
                 {
-                    return true;
+                    if (HaasActionManager.GetAccountGUIDS().Count > 0)
+                    {
+                        return true;
+                    }
                 }
+            }
+            catch
+            {
+                // Just to supress the stack error that occurs for failed connection
             }
 
             return false;

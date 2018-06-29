@@ -35,7 +35,7 @@ namespace BruteScalp
         public decimal SafetyPercentageStep { get; set; } = 0.1m;
 
         // Automation Settings
-        public int MinutesBeforeAutoScalpeRetest { get; set; } = 5;
+        public int MinutesBeforeAutoScalpeRetest { get; set; } = 1440;
         public decimal AmountOfCurrencyForAutoScalpeToUse { get; set; } = 0.1m;
         public int TimeBetweenGlobalSafetyCheck { get; set; } = 5;
         public decimal GlobalPercentageLossToDeactivate { get; set; } = 5m;
