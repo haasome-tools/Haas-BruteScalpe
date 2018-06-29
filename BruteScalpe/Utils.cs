@@ -18,7 +18,7 @@ namespace BruteScalp
             Console.WriteLine(" / /_/ / /  / /_/ / /_/  __/__/ / /__/ /_/ / / /_/ /  __/");
             Console.WriteLine("/_____/_/   \\__,_/\\__/\\___/____/\\___/\\__,_/_/ .___/\\___/ ");
             Console.WriteLine("                                           /_/           ");
-            Console.WriteLine("By: R4stl1n - Special Thanks To Cosmos And Quintus");
+            Console.WriteLine("By: R4stl1n - Special Thanks To Cosmos, Quintus, And ChrisOCC");
             Console.WriteLine();
         }
 

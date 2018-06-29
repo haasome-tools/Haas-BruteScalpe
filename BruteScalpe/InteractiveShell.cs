@@ -293,6 +293,20 @@ namespace BruteScalp
  
                         break;
 
+                    case "neverreativateperecentageloss":
+                        decimal neverreativateperecentageloss_dead = 0;
+
+                        if (Decimal.TryParse(arguments[1], out neverreativateperecentageloss_dead))
+                        {
+                            ConfigManager.SetNeverReactivatePercentageLoss(Convert.ToDecimal(arguments[1]));
+                            Console.WriteLine("[*] Never Reactivate Percentage Loss Set To {0}", arguments[1]);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[!] Argument Is Not A Number");
+                        }
+                        break;
+
                     default:
                         Console.WriteLine("Argument not valid");
                         break;
@@ -714,6 +728,8 @@ namespace BruteScalp
 
             var history = BackTestHistoryManager.GetHistoryForAccount(ConfigManager.mainConfig.AccountGUID);
 
+            decimal activationROI = 0.0m;
+
             List<BackTestResult> backTestResults = new List<BackTestResult>();
 
             if (HaasActionManager.CreateTemplateBot().Equals(""))
@@ -725,7 +741,7 @@ namespace BruteScalp
                 foreach (var market in markets)
                 {
 
-                    BaseCustomBot bot = new BaseCustomBot();
+                    //BaseCustomBot bot = new BaseCustomBot();
 
                     string botName = "BS-" + accountGuidSplit[0] + "-" + market.Item1 + ":" + market.Item2;
 
@@ -744,6 +760,7 @@ namespace BruteScalp
                     // Check if we are above the threshold
                     if (winningTrade.roi >= ConfigManager.mainConfig.KeepThreshold)
                     {
+
                         var btData = AutoScalpeManager.GetHistoryForMarket(ConfigManager.mainConfig.AccountGUID, history, market);
 
                         Console.WriteLine("[*] Auto Management - Market Backtest Above Set Keep Threshold");
@@ -757,38 +774,47 @@ namespace BruteScalp
 
                                 var customBot = HaasActionManager.GetCustomBotByName(botName);
 
+                                
                                 if (customBot != null)
                                 {
-                                    // New ROI larger than last ROI
-
-                                    Console.WriteLine("[*] Auto Management - Better Settings Found For {0}", botName);
-
-                                    // Need to stop bot and update settings then start
-                                    HaasActionManager.DeactivateCustomBot(customBot.GUID);
-
-                                    Console.WriteLine("[*] Auto Management - Deactivate Bot {0}", botName);
-
-                                    // Position of bot
-                                    string currentPosition = "";
-
-                                    if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                                    // Check if we should reactivate the bot at all
+                                    if (customBot.ROI > ConfigManager.mainConfig.NeverReactivatePercentageLoss)
                                     {
-                                        currentPosition = customBot.PriceMarket.PrimaryCurrency;
+                                        // New ROI larger than last ROI
+
+                                        Console.WriteLine("[*] Auto Management - Better Settings Found For {0}", botName);
+
+                                        // Need to stop bot and update settings then start
+                                        HaasActionManager.DeactivateCustomBot(customBot.GUID);
+
+                                        Console.WriteLine("[*] Auto Management - Deactivate Bot {0}", botName);
+
+                                        // Position of bot
+                                        string currentPosition = "";
+
+                                        if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                                        {
+                                            currentPosition = customBot.PriceMarket.PrimaryCurrency;
+                                        }
+                                        else
+                                        {
+                                            currentPosition = customBot.PriceMarket.SecondaryCurrency;
+                                        }
+
+                                        var updatedBot = HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, currentPosition, customBot.CurrentTradeAmount, winningTrade.targetPercentage, winningTrade.safetyPercentage);
+
+                                        Console.WriteLine("[*] Auto Management - Updated Settings Found For {0}", botName);
+
+                                        HaasActionManager.ActivateCustomBot(customBot.GUID);
+
+                                        Console.WriteLine("[*] Auto Management - Reactivated Bot {0}", botName);
+
+                                        BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, updatedBot);
                                     }
                                     else
                                     {
-                                        currentPosition = customBot.PriceMarket.SecondaryCurrency;
+                                        Console.WriteLine("[!] Auto Management - Bot {0}'s ROI Hit NeverReativatePercentageLoss Threshold - Ignoring ", botName);
                                     }
-
-                                    var updatedBot = HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, currentPosition, customBot.CurrentTradeAmount, winningTrade.targetPercentage, winningTrade.safetyPercentage);
-
-                                    Console.WriteLine("[*] Auto Management - Updated Settings Found For {0}", botName);
-
-                                    HaasActionManager.ActivateCustomBot(customBot.GUID);
-
-                                    Console.WriteLine("[*] Auto Management - Reactivated Bot {0}", botName);
-
-                                    BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, updatedBot);
                                 }
                                 else
                                 {
@@ -875,6 +901,9 @@ namespace BruteScalp
 
                                             Console.WriteLine("[*] Auto Management - Bot {0} Reset", botName);
 
+                                            // Need to record this for the auto saftey
+                                            activationROI = customBot.ROI;
+
                                             // Update the position of the bot
                                             HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, currentPosition, customBot.CurrentTradeAmount, customBot.MinimumTargetChange, customBot.MaxAllowedReverseChange);
                                             
@@ -890,6 +919,9 @@ namespace BruteScalp
                                             currentPosition = customBot.PriceMarket.SecondaryCurrency;
                                         }
 
+                                        // Need to record this for the auto saftey
+                                        activationROI = customBot.ROI;
+
                                         HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, currentPosition, customBot.CurrentTradeAmount, customBot.MinimumTargetChange, customBot.MaxAllowedReverseChange);
                                     }
                                 }
@@ -897,7 +929,7 @@ namespace BruteScalp
                         }
                     }
 
-                    BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, market.Item1, market.Item2, winningTrade.roi);
+                    BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, market.Item1, market.Item2, winningTrade.roi, activationROI);
 
                     Console.WriteLine("[*] Auto Management - Winning {0} - Target: {1} Saftey {2} ROI: {3:N4}%", "BS-" + market.Item1 + ":" + market.Item2, winningTrade.targetPercentage, winningTrade.safetyPercentage, winningTrade.roi);
                     
@@ -925,9 +957,20 @@ namespace BruteScalp
 
             Console.WriteLine("[*] Auto Management - Processing Auto Safety Test");
 
+            decimal activationRoi = 0.0m;
+
+
             foreach (var customBot in customBots)
             {
-                if(customBot.ROI < (-ConfigManager.mainConfig.GlobalPercentageLossToDeactivate))
+
+                var backTestHistory = BackTestHistoryManager.GetHistoryForBot(customBot);
+
+                if(backTestHistory != null)
+                {
+                    activationRoi = backTestHistory.ActivationROI;
+                }
+
+                if (customBot.ROI < (activationRoi + (-ConfigManager.mainConfig.GlobalPercentageLossToDeactivate)))
                 {
                     Console.WriteLine("[*] Auto Management - Deactivating Bot {0} Due To Auto Safety Check", customBot.Name);
 

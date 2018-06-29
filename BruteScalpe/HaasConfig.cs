@@ -40,6 +40,7 @@ namespace BruteScalp
         public int TimeBetweenGlobalSafetyCheck { get; set; } = 5;
         public decimal GlobalPercentageLossToDeactivate { get; set; } = 5m;
         public bool SellPositionWhenBotDeactivates { get; set; } = true;
+        public decimal NeverReactivatePercentageLoss { get; set; } = 20.0m;
 
         public List<Tuple<string, string>> MarketsToTest { get; set; } = new List<Tuple<string, string>>();
 

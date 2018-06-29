@@ -203,5 +203,10 @@ namespace BruteScalp
         {
             ConfigManager.mainConfig.SellPositionWhenBotDeactivates = toSell;
         }
+
+        public static void SetNeverReactivatePercentageLoss(decimal percentage)
+        {
+            ConfigManager.mainConfig.NeverReactivatePercentageLoss = percentage;
+        }
     }
 }
