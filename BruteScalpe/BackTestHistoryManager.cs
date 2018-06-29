@@ -49,6 +49,17 @@ namespace BruteScalp
             }
         }
 
+        public static bool DeleteBackTestHistory() {
+            
+            if (File.Exists(DefaultBackTestHistoryFileName))
+            {
+                File.Delete(DefaultBackTestHistoryFileName);
+                return true;
+            }
+
+            return false;
+        }
+
         public static void AddHistoryEntry(string accountGuid, BaseCustomBot baseCustomBot)
         {
             BackTestData backTestData = new BackTestData();

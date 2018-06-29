@@ -272,8 +272,21 @@ namespace BruteScalp
             if (HaasActionManager.CheckHaasConnection())
             {
                 HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
-                haasonlineClient.CustomBotApi.RemoveBot(HaasActionManager.BaseBotTemplateGuid);
+                var deleteTask = Task.Run(async () => await haasonlineClient.CustomBotApi.RemoveBot(HaasActionManager.BaseBotTemplateGuid));
+
+                deleteTask.Wait();
             }
+        }
+
+        public static void DeleteBot(string botGuid)
+        {
+            if (HaasActionManager.CheckHaasConnection())
+            {
+                HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
+                var deleteTask = Task.Run(async () => await haasonlineClient.CustomBotApi.RemoveBot(botGuid));
+
+                deleteTask.Wait();
+            }  
         }
 
         public static bool GrabMarketData(string market, string maincoin)

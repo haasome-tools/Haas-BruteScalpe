@@ -16,9 +16,9 @@ namespace BruteScalp
     {
         private const string HistFileName = "brutescalp-cmd";
         private static System.Timers.Timer autoScalpeTimer;
-        private static System.Timers.Timer autoSafety;
+        private static System.Timers.Timer autoSafetyTimer;
 
-        private bool autoStarted = false;
+        private bool autoScalpeStarted = false;
         private bool autoSafetyStarted = false;
 
         [CmdCommand(Command = "exit", Description = StaticStrings.EXIT_HELP_TEXT)]
@@ -670,11 +670,11 @@ namespace BruteScalp
             }
         }
 
-        [CmdCommand(Command = "start-auto-scalpe", Description = StaticStrings.START_SCREENER_HELP_TEXT)]
+        [CmdCommand(Command = "start-auto-scalpe", Description = StaticStrings.START_AUTO_SCALPE_HELP_TEXT)]
         public void StartAutoScalpeCommand(string arg)
         {
 
-            if (!autoStarted)
+            if (!autoScalpeStarted)
             {
                 Console.WriteLine("[*] Starting Auto Scalpe Process");
                 Console.WriteLine("[*] Performing Initial AutoScalpe Update");
@@ -688,7 +688,7 @@ namespace BruteScalp
 
                 autoScalpeTimer.Start();
 
-                autoStarted = true;
+                autoScalpeStarted = true;
             }
             else
             {
@@ -696,7 +696,18 @@ namespace BruteScalp
             }
         }
 
-        [CmdCommand(Command = "start-auto-safety", Description = StaticStrings.START_SCREENER_HELP_TEXT)]
+        [CmdCommand(Command = "stop-auto-scalpe", Description = StaticStrings.STOP_AUTO_SCALPE_HELP_TEXT)]
+        public void StopAutoScalpeCommand(string arg)
+        {
+            Console.WriteLine("[*] Stopping The Auto Scalpe Process");
+            if (autoScalpeTimer != null)
+            {
+                autoScalpeTimer.Stop();
+                autoScalpeStarted = false;
+            }
+        }
+
+        [CmdCommand(Command = "start-auto-safety", Description = StaticStrings.START_AUTO_SAFETY_HELP_TEXT)]
         public void StartAutoSafetyCommand(string arg)
         {
             if (!autoSafetyStarted)
@@ -705,10 +716,10 @@ namespace BruteScalp
 
                 Console.WriteLine("[*] Scheduled Reoccuring Auto Saftey Test To {0} Minutes", TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBetweenGlobalSafetyCheck));
 
-                autoSafety = new System.Timers.Timer(Convert.ToInt32(TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBetweenGlobalSafetyCheck).TotalMilliseconds));
-                autoSafety.Elapsed += async (sender, e) => await ProcessAutoSafetyUpdate();
+                autoSafetyTimer = new System.Timers.Timer(Convert.ToInt32(TimeSpan.FromMinutes(ConfigManager.mainConfig.TimeBetweenGlobalSafetyCheck).TotalMilliseconds));
+                autoSafetyTimer.Elapsed += async (sender, e) => await ProcessAutoSafetyUpdate();
 
-                autoSafety.Start();
+                autoSafetyTimer.Start();
 
                 autoSafetyStarted = true;
             }
@@ -716,6 +727,136 @@ namespace BruteScalp
             {
                 Console.WriteLine("[*] Auto Safety Already Running");
             }
+        }
+
+        [CmdCommand(Command = "stop-auto-safety", Description = StaticStrings.STOP_AUTO_SAFETY_HELP_TEXT)]
+        public void StopAutoSafetyCommand(string arg)
+        {
+            Console.WriteLine("[*] Stopping The Auto Safety Process");
+            if (autoSafetyTimer != null)
+            {
+                autoSafetyTimer.Stop();
+                autoSafetyStarted = false;
+            }
+        }
+
+        [CmdCommand(Command = "deactivate-all-bots", Description = StaticStrings.DEACTIVATE_ALL_BOTS_HELP_TEXT)]
+        public void DeactivateAllBotsCommand(string arg) {
+
+            string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
+
+
+            var customBots = HaasActionManager.GetAllCustomBots();
+
+            var markets = AutoScalpeManager.GetMarketsPrioritized();
+
+            Console.WriteLine("[*] Deactivating All Bots And Closing Open Orders");
+
+            foreach (var market in markets)
+            {
+
+                string botName = "BS-" + accountGuidSplit[0] + "-" + market.Item1 + ":" + market.Item2;
+
+                var customBot = HaasActionManager.GetCustomBotByName(botName);
+
+                if (customBot != null)
+                {
+                    HaasActionManager.RemoveOpenOrder(customBot.OpenOrderId);
+                    HaasActionManager.DeactivateCustomBot(customBot.GUID);
+
+                }
+
+            }
+        }
+
+        [CmdCommand(Command = "sell-all-bot-positions", Description = StaticStrings.SELL_ALL_BOT_POSITIONS_HELP_TEXT)]
+        public void SellAllBotPositionsCommand(string arg)
+        {
+            string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
+
+
+            var customBots = HaasActionManager.GetAllCustomBots();
+
+            var markets = AutoScalpeManager.GetMarketsPrioritized();
+
+            Console.WriteLine("[*] Market Selling All Bots Positions Managed By BruteScalpe");
+
+            foreach (var market in markets)
+            {
+
+                string botName = "BS-" + accountGuidSplit[0] + "-" + market.Item1 + ":" + market.Item2;
+
+                var customBot = HaasActionManager.GetScalperBotByName(botName);
+
+                if (customBot != null)
+                {
+
+                    if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                    {
+                        var currentPosition = customBot.PriceMarket.SecondaryCurrency;
+
+
+                        Console.WriteLine("[*] Auto Management - Placing Market Sell For Bot {0} Position", botName);
+
+                        // Sell the position using market.
+                        HaasActionManager.MarketSellPosition(market.Item1, market.Item2, customBot.CurrentTradeAmount);
+
+                    }
+
+
+                    HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, 
+                                                       customBot.PriceMarket.SecondaryCurrency, customBot.CurrentTradeAmount, 
+                                                       customBot.MinimumTargetChange, customBot.MaxAllowedReverseChange);
+
+                }
+
+            }
+        }
+
+        [CmdCommand(Command = "remove-all-bots", Description = StaticStrings.REMOVE_ALL_BOTS_HELP_TEXT)]
+        public void RemoveAllBotsCommand(string arg)
+        {
+            string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
+
+
+            var customBots = HaasActionManager.GetAllCustomBots();
+
+            var markets = AutoScalpeManager.GetMarketsPrioritized();
+
+            Console.WriteLine("[*] Deleteing All Bots Managed By BruteScalpe");
+
+            foreach (var market in markets)
+            {
+
+                string botName = "BS-" + accountGuidSplit[0] + "-" + market.Item1 + ":" + market.Item2;
+
+                var customBot = HaasActionManager.GetScalperBotByName(botName);
+
+                if (customBot != null)
+                {
+                    HaasActionManager.DeleteBot(customBot.GUID);
+                }
+
+            }
+        }
+
+        [CmdCommand(Command = "reset-brute-scalpe", Description = StaticStrings.CLEAN_UP_HELP_TEXT)]
+        public void ResetBruteScalpeCommand(string arg)
+        {
+            Console.WriteLine("[!!!!] Reseting Brute Scalpe");
+            StopAutoSafetyCommand("");
+            StopAutoScalpeCommand("");
+            DeactivateAllBotsCommand("");
+            SellAllBotPositionsCommand("");
+            RemoveAllBotsCommand("");
+
+            Console.WriteLine("[*] Deleting Backtest History");
+            BackTestHistoryManager.DeleteBackTestHistory();
+
+            Console.WriteLine("[*] Reset Completed App will close in 5 seconds");
+            Thread.Sleep(5000);
+
+            ExitLoop();
         }
 
         public Task<string> ProcessAutoScalpeUpdate()

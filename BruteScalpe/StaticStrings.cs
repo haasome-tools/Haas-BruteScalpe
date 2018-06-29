@@ -23,7 +23,14 @@ namespace BruteScalp
         public const string ADD_TEST_MARKET_HELP_TEXT = "Add a market to the list";
         public const string REMOVE_TEST_MARKET_HELP_TEXT = "Remove a market from the list";
         public const string SHOW_TEST_MARKETS_HELP_TEXT = "Show current selected test markets";
-
+        public const string START_AUTO_SCALPE_HELP_TEXT = "Starts the auto scalpe process";
+        public const string STOP_AUTO_SCALPE_HELP_TEXT = "Stop auto scalpe process";
+        public const string START_AUTO_SAFETY_HELP_TEXT = "Starts the auto safety process";
+        public const string STOP_AUTO_SAFETY_HELP_TEXT = "Stop auto safety process";
+        public const string CLEAN_UP_HELP_TEXT = "Remove all bots";
+        public const string DEACTIVATE_ALL_BOTS_HELP_TEXT = "Deactivate all bots";
+        public const string SELL_ALL_BOT_POSITIONS_HELP_TEXT = "Sell all bot positions";
+        public const string REMOVE_ALL_BOTS_HELP_TEXT = "Remove all bots";
 
     }
 }
