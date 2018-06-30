@@ -31,6 +31,8 @@ namespace BruteScalp
         public const string DEACTIVATE_ALL_BOTS_HELP_TEXT = "Deactivate all bots";
         public const string SELL_ALL_BOT_POSITIONS_HELP_TEXT = "Sell all bot positions";
         public const string REMOVE_ALL_BOTS_HELP_TEXT = "Remove all bots";
+        public const string RESET_BRUTE_SCALPE_HELP_TEXT = "Reset Brute scalpe completely";
+        public const string RESET_TEST_MARKET_HELP_TEXT = "Reset a individual market";
 
     }
 }

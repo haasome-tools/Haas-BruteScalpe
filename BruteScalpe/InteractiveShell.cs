@@ -774,7 +774,6 @@ namespace BruteScalp
         {
             string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
 
-
             var customBots = HaasActionManager.GetAllCustomBots();
 
             var markets = AutoScalpeManager.GetMarketsPrioritized();
@@ -840,7 +839,7 @@ namespace BruteScalp
             }
         }
 
-        [CmdCommand(Command = "reset-brute-scalpe", Description = StaticStrings.CLEAN_UP_HELP_TEXT)]
+        [CmdCommand(Command = "reset-brute-scalpe", Description = StaticStrings.RESET_BRUTE_SCALPE_HELP_TEXT)]
         public void ResetBruteScalpeCommand(string arg)
         {
             Console.WriteLine("[!!!!] Reseting Brute Scalpe");
@@ -852,11 +851,50 @@ namespace BruteScalp
 
             Console.WriteLine("[*] Deleting Backtest History");
             BackTestHistoryManager.DeleteBackTestHistory();
+            BackTestHistoryManager.PerformStartup();
+ 
+        }
 
-            Console.WriteLine("[*] Reset Completed App will close in 5 seconds");
-            Thread.Sleep(5000);
+        [CmdCommand(Command = "reset-test-market", Description = StaticStrings.RESET_TEST_MARKET_HELP_TEXT)]
+        public void ResetTestMarketCommand(string arg)
+        {
+            string[] arguments = Utils.SplitArgumentsSaftley(arg);
 
-            ExitLoop();
+            string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
+
+            if (arguments.Length >= 2)
+            {
+                string botName = "BS-" + accountGuidSplit[0] + "-" + arguments[0] + ":" + arguments[1];
+
+                var history = BackTestHistoryManager.GetHistoryForAccount(ConfigManager.mainConfig.AccountGUID);
+
+                var customBot = HaasActionManager.GetScalperBotByName(botName);
+
+                if (customBot != null)
+                {
+                    var btData = AutoScalpeManager.GetHistoryForMarket(ConfigManager.mainConfig.AccountGUID, history, new Tuple<string, string>(arguments[0], arguments[1]));
+
+                    HaasActionManager.DeactivateCustomBot(customBot.GUID);
+                
+                    if (customBot.CoinPosition == Haasonline.Public.LocalApi.CSharp.Enums.EnumCoinsPosition.Bought)
+                    {
+                        Console.WriteLine("[*] Market Retest - Placing Market Sell For Bot {0} Position", botName);
+
+                        // Sell the position using market.
+                        HaasActionManager.MarketSellPosition(arguments[0], arguments[1], customBot.CurrentTradeAmount);
+
+                    }
+                    BackTestHistoryManager.RemoveHistoryEntry(btData);
+                    HaasActionManager.DeleteBot(customBot.GUID);
+
+                    PerformRetest(arguments[0], arguments[1]);
+                }
+            }
+            else
+            {
+                Console.WriteLine("[!] Not Enough Arguments Specified");
+                Console.WriteLine("Ex. retest-test-market <primaryCoin> <SecondaryCoin>");
+            }
         }
 
         public Task<string> ProcessAutoScalpeUpdate()
@@ -889,7 +927,6 @@ namespace BruteScalp
                 {
                     try
                     {
-                        //BaseCustomBot bot = new BaseCustomBot();
 
                         string botName = "BS-" + accountGuidSplit[0] + "-" + market.Item1 + ":" + market.Item2;
 
@@ -1187,6 +1224,55 @@ namespace BruteScalp
             }
 
             return Task.FromResult(string.Empty);
+        }
+
+        public void PerformRetest(string primaryCoin, string secondaryCoin)
+        {
+
+            Console.WriteLine("[*] Market Retest - Performing Retest on Market {0}/{1}", primaryCoin, secondaryCoin);
+
+            string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
+            
+            var accountInfo = HaasActionManager.GetAccountInformation();
+            string botName = "BS-" + accountGuidSplit[0] + "-" + primaryCoin + ":" + secondaryCoin;
+
+            try
+            {
+                var winningTrade = HaasActionManager.PerformFullTest(primaryCoin, secondaryCoin);
+
+                // Check if we are above the threshold
+                if (winningTrade.roi >= ConfigManager.mainConfig.KeepThreshold)
+                {
+
+                    Console.WriteLine("[*] Market Retest - Market Backtest Above Set Keep Threshold");
+
+
+                    Console.WriteLine("[*] Market Retest - Creating New Scalper Bot {0}", botName);
+
+                    var priceTicker = HaasActionManager.GetOneMinutePriceDataForMarket(accountInfo.ConnectedPriceSource, primaryCoin, secondaryCoin);
+
+                    var amount = ConfigManager.mainConfig.AmountOfCurrencyForAutoScalpeToUse / priceTicker.Close;
+
+                    // No History create bot
+                    var newBot = HaasActionManager.CreateAutoPersistentBot(botName, primaryCoin, secondaryCoin, Math.Round(amount), winningTrade.targetPercentage, winningTrade.safetyPercentage);
+
+                    HaasActionManager.ActivateCustomBot(newBot.GUID);
+
+                    Console.WriteLine("[*] Market Retest - Activated Bot {0}", botName);
+
+                }
+                else
+                {
+                    Console.WriteLine("[*] Market Retest Below Threshold");
+                }
+
+                BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, primaryCoin, secondaryCoin, winningTrade.roi, 0.0m);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("[!] Exception occured StackTrace Follows:\n {0}", e.ToString());
+            }
+
         }
 
         public InteractiveShell()
