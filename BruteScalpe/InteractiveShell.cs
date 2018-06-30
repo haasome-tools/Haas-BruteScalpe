@@ -1048,9 +1048,9 @@ namespace BruteScalp
                             {
                                 var customBot = HaasActionManager.GetScalperBotByName(botName);
 
-                                if (customBot.Activated)
+                                if (customBot != null)
                                 {
-                                    if (customBot != null)
+                                    if (customBot.Activated)
                                     {
                                         // We need to check if the losing roi can cover the current bots roi. If so we leave it running if not we stop the bot
                                         if ((customBot.ROI + winningTrade.roi) > 0.0m)
