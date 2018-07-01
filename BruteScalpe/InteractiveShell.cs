@@ -954,7 +954,7 @@ namespace BruteScalp
                             if (customBot != null)
                             {
                                 // Check if we should reactivate the bot at all
-                                if (customBot.ROI > ConfigManager.mainConfig.NeverReactivatePercentageLoss)
+                                if (customBot.ROI > (-ConfigManager.mainConfig.NeverReactivatePercentageLoss))
                                 {
 
                                     Console.WriteLine("[*] Auto Management - Better Settings Found For {0}", botName);
@@ -985,6 +985,10 @@ namespace BruteScalp
                                     Console.WriteLine("[*] Auto Management - Reactivated Bot {0}", botName);
 
                                     BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, updatedBot);
+                                }
+                                else
+                                {
+                                    Console.WriteLine("[*] Auto Management - Ignoring {0} has permanently disabled", botName);
                                 }
                             }
                             else
