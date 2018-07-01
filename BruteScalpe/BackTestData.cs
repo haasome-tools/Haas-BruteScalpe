@@ -19,7 +19,6 @@ namespace BruteScalp
         public string AccountGUID { get; set; }
         public string PrimaryCurrency { get; set; }
         public string SecondayCurrency { get; set; }
-        public decimal WinningROI { get; set; }
         public decimal ActivationROI { get; set; }
 
     }

@@ -68,7 +68,6 @@ namespace BruteScalp
             backTestData.Exchange = baseCustomBot.PriceMarket.PriceSource;
             backTestData.PrimaryCurrency = baseCustomBot.PriceMarket.PrimaryCurrency;
             backTestData.SecondayCurrency = baseCustomBot.PriceMarket.SecondaryCurrency;
-            backTestData.WinningROI = baseCustomBot.ROI;
             backTestData.ActivationROI = baseCustomBot.ROI;
 
             BackTestHistoryManager.backTestHistory.history.Add(backTestData);
@@ -92,7 +91,7 @@ namespace BruteScalp
             BackTestHistoryManager.AddHistoryEntry(accountGuid, baseCustomBot);
         }
 
-        public static void AddHistoryEntry(string accountGuid, EnumPriceSource priceSource, string primaryCurrency, string secondaryCurrency, decimal roi, decimal activationRoi)
+        public static void AddHistoryEntry(string accountGuid, EnumPriceSource priceSource, string primaryCurrency, string secondaryCurrency, decimal activationRoi)
         {
             BackTestData backTestData = new BackTestData();
 
@@ -100,13 +99,12 @@ namespace BruteScalp
             backTestData.Exchange = priceSource;
             backTestData.PrimaryCurrency = primaryCurrency;
             backTestData.SecondayCurrency = secondaryCurrency;
-            backTestData.WinningROI = roi;
             backTestData.ActivationROI = activationRoi;
 
             BackTestHistoryManager.backTestHistory.history.Add(backTestData);
         }
 
-        public static void UpdateHistoryEntry(string accountGuid, EnumPriceSource priceSource, string primaryCurrency, string secondaryCurrency, decimal roi, decimal activationRoi)
+        public static void UpdateHistoryEntry(string accountGuid, EnumPriceSource priceSource, string primaryCurrency, string secondaryCurrency, decimal activationRoi)
         {
 
             foreach (var backTestEntry in BackTestHistoryManager.backTestHistory.history)
@@ -116,12 +114,12 @@ namespace BruteScalp
                     backTestEntry.SecondayCurrency == secondaryCurrency)
                 {
                     BackTestHistoryManager.RemoveHistoryEntry(backTestEntry);
-                    BackTestHistoryManager.AddHistoryEntry(accountGuid, priceSource, primaryCurrency, secondaryCurrency, roi, activationRoi);
+                    BackTestHistoryManager.AddHistoryEntry(accountGuid, priceSource, primaryCurrency, secondaryCurrency, activationRoi);
                     return;
                 }
             }
 
-            BackTestHistoryManager.AddHistoryEntry(accountGuid, priceSource, primaryCurrency, secondaryCurrency, roi, activationRoi);
+            BackTestHistoryManager.AddHistoryEntry(accountGuid, priceSource, primaryCurrency, secondaryCurrency, activationRoi);
 
         }
 
