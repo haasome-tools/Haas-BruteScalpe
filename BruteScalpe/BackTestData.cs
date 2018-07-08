@@ -20,6 +20,7 @@ namespace BruteScalp
         public string PrimaryCurrency { get; set; }
         public string SecondayCurrency { get; set; }
         public decimal ActivationROI { get; set; }
+        public decimal ObservedHigh { get; set; }
 
     }
 }

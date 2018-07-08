@@ -941,6 +941,8 @@ namespace BruteScalp
 
                         var winningTrade = HaasActionManager.PerformFullTest(market.Item1, market.Item2);
 
+                        BaseCustomBot botInfo = null;
+
                         // Check if we are above the threshold
                         if (winningTrade.roi >= ConfigManager.mainConfig.KeepThreshold)
                         {
@@ -950,9 +952,10 @@ namespace BruteScalp
 
                             var customBot = HaasActionManager.GetCustomBotByName(botName);
 
-
                             if (customBot != null)
                             {
+                                botInfo = customBot;
+
                                 // Check if we should reactivate the bot at all
                                 if (customBot.ROI > (-ConfigManager.mainConfig.NeverReactivatePercentageLoss))
                                 {
@@ -1015,6 +1018,9 @@ namespace BruteScalp
 
                             if (customBot != null)
                             {
+
+                                botInfo = customBot;
+
                                 if (customBot.Activated)
                                 {
                                     Console.WriteLine("[*] Auto Management - Deactivating Bot {0} Due To Past Market Test", botName);
@@ -1070,7 +1076,23 @@ namespace BruteScalp
                             }
                         }
 
-                        BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, market.Item1, market.Item2, activationROI);
+                        var observedHighValue = 0.0m;
+
+                        if (botInfo != null)
+                        {
+                            var botHistory = BackTestHistoryManager.GetHistoryForBot(botInfo);
+
+                            if (botHistory != null)
+                            {
+                                if (botInfo.ROI > botHistory.ObservedHigh)
+                                {
+                                    observedHighValue = botInfo.ROI;
+                                }
+                            }
+
+                        }
+
+                        BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, market.Item1, market.Item2, activationROI, observedHighValue);
 
                         Console.WriteLine("[*] Auto Management - Winning {0} - Target: {1} Saftey {2} ROI: {3:N4}%", "BS-" + market.Item1 + ":" + market.Item2, winningTrade.targetPercentage, winningTrade.safetyPercentage, winningTrade.roi);
 
@@ -1101,6 +1123,8 @@ namespace BruteScalp
 
             var customBots = HaasActionManager.GetAllCustomBotsWithPrefix(botNamePrefixToMatch);
 
+            var accountInfo = HaasActionManager.GetAccountInformation();
+
             Console.WriteLine("[*] Auto Management - Processing Auto Safety Test");
 
             decimal activationRoi = 0.0m;
@@ -1116,10 +1140,24 @@ namespace BruteScalp
 
                         if (backTestHistory != null)
                         {
+                            // Observer High Update
                             activationRoi = backTestHistory.ActivationROI;
+
+                            var observedHighValue = 0.0m;
+
+
+                            var botHistory = BackTestHistoryManager.GetHistoryForBot(customBot);
+
+                            if (customBot.ROI > botHistory.ObservedHigh)
+                            {
+                                observedHighValue = customBot.ROI;
+                            }
+
+                            BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, backTestHistory.ActivationROI, observedHighValue);
+
                         }
 
-                        if (customBot.ROI < (activationRoi + (-ConfigManager.mainConfig.GlobalPercentageLossToDeactivate)))
+                        if (customBot.ROI < (backTestHistory.ObservedHigh - ConfigManager.mainConfig.GlobalPercentageLossToDeactivate) && (customBot.ROI < (activationRoi + (-ConfigManager.mainConfig.GlobalPercentageLossToDeactivate))))
                         {
                             Console.WriteLine("[*] Auto Management - Deactivating Bot {0} Due To Auto Safety Check", customBot.Name);
 
@@ -1172,6 +1210,7 @@ namespace BruteScalp
                             BackTestHistoryManager.RemoveHistoryEntry(backTestData);
                         }
                     }
+
                 }
                 catch (Exception e)
                 {
@@ -1222,7 +1261,7 @@ namespace BruteScalp
                     Console.WriteLine("[*] Market Retest Below Threshold");
                 }
 
-                BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, primaryCoin, secondaryCoin, 0.0m);
+                BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, primaryCoin, secondaryCoin, 0.0m, 0.0m);
             }
             catch (Exception e)
             {

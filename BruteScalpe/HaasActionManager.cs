@@ -257,8 +257,10 @@ namespace BruteScalp
                 if (markets.Count > 0)
                 {
                     HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
-                    var newBot = haasonlineClient.CustomBotApi.NewBot<ScalperBot>(Haasonline.Public.LocalApi.CSharp.Enums.EnumCustomBotType.ScalperBot,
-                        "BruteScalpe-Template", ConfigManager.mainConfig.AccountGUID, markets[0].Item1, markets[0].Item2, "");
+                    var newBot = Task.Run(async () => await haasonlineClient.CustomBotApi.NewBot<ScalperBot>(Haasonline.Public.LocalApi.CSharp.Enums.EnumCustomBotType.ScalperBot,
+                        "BruteScalpe-Template", ConfigManager.mainConfig.AccountGUID, markets[0].Item1, markets[0].Item2, ""));
+
+                    newBot.Wait();
 
                     HaasActionManager.BaseBotTemplateGuid = newBot.Result.Result.GUID;
                 }
@@ -309,7 +311,7 @@ namespace BruteScalp
                 if (counter > 30)
                     return false;
 
-                Thread.Sleep(1000);
+                Thread.Sleep(3000);
             }
 
             return true;
