@@ -21,6 +21,7 @@ namespace BruteScalp
         public string SecondayCurrency { get; set; }
         public decimal ActivationROI { get; set; }
         public decimal ObservedHigh { get; set; }
+        public decimal StaticBackTestValue { get; set; }
 
     }
 }

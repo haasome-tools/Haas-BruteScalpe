@@ -635,7 +635,7 @@ namespace BruteScalp
 
                                 string botName = "BS-" + accountGuidSplit[0] + "-" + market.Item1 + ":" + market.Item2;
 
-                                BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, botWinning);
+                                BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, 0.0m, winningROIValue, botWinning);
 
                                 HaasActionManager.CreatePersistentBot(botName, market.Item1, market.Item2, winningTargetPercentage, winningSafetyPercentage);
                             }
@@ -649,6 +649,9 @@ namespace BruteScalp
                         Console.WriteLine("[*] Winning {0} - Target: {1} Saftey {2} ROI: {3}% - {4}", "BS-" + market.Item1 + ":" + market.Item2, winningTargetPercentage, winningSafetyPercentage, winningROIValue, details);
 
                         index++;
+
+                        BackTestHistoryManager.SaveBackTestHistory();
+
                     } catch (Exception e ) {
                         Console.WriteLine("[!] Exception occured StackTrace Follows:\n {0}", e.ToString());
                     }
@@ -664,7 +667,6 @@ namespace BruteScalp
                     }
                 }
 
-                BackTestHistoryManager.SaveBackTestHistory();
 
                 HaasActionManager.DeleteTemplateBot();
             }
@@ -897,6 +899,24 @@ namespace BruteScalp
             }
         }
 
+        [CmdCommand(Command = "load-all-markets", Description = StaticStrings.LOAD_ALL_MARKETS_HELP_TEXT)]
+        public void LoadAllMarkets(string arg)
+        {
+            string[] arguments = Utils.SplitArgumentsSaftley(arg);
+
+            string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
+
+            var markets = HaasActionManager.GetMarkets();
+
+
+            foreach(var market in markets)
+            {
+                ConfigManager.AddMarketToTest(market.Item1, market.Item2);
+            }
+
+            Console.WriteLine("[*] All markets loaded - may god have mercy on your soul");
+        }
+
         public Task<string> ProcessAutoScalpeUpdate()
         {
             Console.WriteLine();
@@ -914,6 +934,7 @@ namespace BruteScalp
             var history = BackTestHistoryManager.GetHistoryForAccount(ConfigManager.mainConfig.AccountGUID);
 
             decimal activationROI = 0.0m;
+            decimal staticBackTestROI = 0.0m;
 
             List<BackTestResult> backTestResults = new List<BackTestResult>();
 
@@ -947,6 +968,8 @@ namespace BruteScalp
                         if (winningTrade.roi >= ConfigManager.mainConfig.KeepThreshold)
                         {
                             var btData = AutoScalpeManager.GetHistoryForMarket(ConfigManager.mainConfig.AccountGUID, history, market);
+
+                            staticBackTestROI = btData.StaticBackTestValue;
 
                             Console.WriteLine("[*] Auto Management - Market Backtest Above Set Keep Threshold");
 
@@ -987,7 +1010,7 @@ namespace BruteScalp
 
                                     Console.WriteLine("[*] Auto Management - Reactivated Bot {0}", botName);
 
-                                    BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, updatedBot);
+                                    BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, updatedBot.ROI, btData.StaticBackTestValue, updatedBot);
                                 }
                                 else
                                 {
@@ -1052,7 +1075,6 @@ namespace BruteScalp
 
                                         // Need to record this for the auto saftey
                                         activationROI = customBot.ROI;
-
                                         // Update the position of the bot
                                         HaasActionManager.UpdateScalperBot(customBot.GUID, botName, market.Item1, market.Item2, currentPosition, customBot.CurrentTradeAmount, customBot.MinimumTargetChange, customBot.MaxAllowedReverseChange);
 
@@ -1088,11 +1110,13 @@ namespace BruteScalp
                                 {
                                     observedHighValue = botInfo.ROI;
                                 }
+
+                                staticBackTestROI = botHistory.StaticBackTestValue;
                             }
 
                         }
 
-                        BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, market.Item1, market.Item2, activationROI, observedHighValue);
+                        BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, market.Item1, market.Item2, activationROI, observedHighValue, staticBackTestROI);
 
                         Console.WriteLine("[*] Auto Management - Winning {0} - Target: {1} Saftey {2} ROI: {3:N4}%", "BS-" + market.Item1 + ":" + market.Item2, winningTrade.targetPercentage, winningTrade.safetyPercentage, winningTrade.roi);
 
@@ -1153,7 +1177,7 @@ namespace BruteScalp
                                 observedHighValue = customBot.ROI;
                             }
 
-                            BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, backTestHistory.ActivationROI, observedHighValue);
+                            BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, customBot.PriceMarket.PrimaryCurrency, customBot.PriceMarket.SecondaryCurrency, backTestHistory.ActivationROI, observedHighValue, botHistory.StaticBackTestValue);
 
                         }
 
@@ -1261,7 +1285,7 @@ namespace BruteScalp
                     Console.WriteLine("[*] Market Retest Below Threshold");
                 }
 
-                BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, primaryCoin, secondaryCoin, 0.0m, 0.0m);
+                BackTestHistoryManager.UpdateHistoryEntry(ConfigManager.mainConfig.AccountGUID, accountInfo.ConnectedPriceSource, primaryCoin, secondaryCoin, 0.0m, 0.0m, 0.0m);
             }
             catch (Exception e)
             {
