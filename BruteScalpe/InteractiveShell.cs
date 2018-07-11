@@ -908,13 +908,24 @@ namespace BruteScalp
 
             var markets = HaasActionManager.GetMarkets();
 
-
-            foreach(var market in markets)
+            if (arguments.Length >= 1)
             {
-                ConfigManager.AddMarketToTest(market.Item1, market.Item2);
+                foreach (var market in markets)
+                {
+
+                    if (market.Item2.Equals(arguments[0].ToUpper()))
+                    {
+                        ConfigManager.AddMarketToTest(market.Item1, market.Item2);
+                    }
+                }
+
+                Console.WriteLine("[*] All markets loaded - may god have mercy on your soul");
+            }
+            else
+            {
+                Console.WriteLine("[!] Not Enough Parameters. Ex. load-all-markets BTC");
             }
 
-            Console.WriteLine("[*] All markets loaded - may god have mercy on your soul");
         }
 
         public Task<string> ProcessAutoScalpeUpdate()
