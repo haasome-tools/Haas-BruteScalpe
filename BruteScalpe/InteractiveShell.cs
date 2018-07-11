@@ -934,6 +934,7 @@ namespace BruteScalp
             var history = BackTestHistoryManager.GetHistoryForAccount(ConfigManager.mainConfig.AccountGUID);
 
             decimal activationROI = 0.0m;
+
             decimal staticBackTestROI = 0.0m;
 
             List<BackTestResult> backTestResults = new List<BackTestResult>();
@@ -969,7 +970,10 @@ namespace BruteScalp
                         {
                             var btData = AutoScalpeManager.GetHistoryForMarket(ConfigManager.mainConfig.AccountGUID, history, market);
 
-                            staticBackTestROI = btData.StaticBackTestValue;
+                            if (btData != null)
+                            {
+                                staticBackTestROI = btData.StaticBackTestValue;
+                            }
 
                             Console.WriteLine("[*] Auto Management - Market Backtest Above Set Keep Threshold");
 
