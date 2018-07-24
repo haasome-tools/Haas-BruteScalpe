@@ -819,7 +819,6 @@ namespace BruteScalp
         {
             string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
 
-
             var customBots = HaasActionManager.GetAllCustomBots();
 
             var markets = AutoScalpeManager.GetMarketsPrioritized();
@@ -926,6 +925,23 @@ namespace BruteScalp
                 Console.WriteLine("[!] Not Enough Parameters. Ex. load-all-markets BTC");
             }
 
+        }
+
+        [CmdCommand(Command ="clear-all-temp", Description = StaticStrings.CLEAR_ALL_TEMP)]
+        public void ClearAllTemplateBots(string arg)
+        {
+            string[] accountGuidSplit = ConfigManager.mainConfig.AccountGUID.Split('-');
+
+            var customBots = HaasActionManager.GetAllCustomBots();
+
+            foreach (var bot in customBots)
+            {
+                if(bot.Name == "Temp-BruteScalpe-Template")
+                {
+                    HaasActionManager.DeleteBot(bot.GUID);
+                    Thread.Sleep(500);
+                }
+            }
         }
 
         public Task<string> ProcessAutoScalpeUpdate()
