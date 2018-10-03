@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Haasonline.LocalApi.CSharp.Enums;
 using Haasonline.Public.LocalApi.CSharp.DataObjects.MarketData;
 using Haasonline.Public.LocalApi.CSharp.Enums;
 
@@ -28,7 +27,7 @@ namespace BruteScalp
 
                 var accounts = haasonlineClient.AccountDataApi.GetEnabledAccounts();
 
-                if (accounts.Result.ErrorCode == Haasonline.LocalApi.CSharp.Enums.EnumErrorCode.Success)
+                if (accounts.Result.ErrorCode == EnumErrorCode.Success)
                 {
                     if (HaasActionManager.GetAccountGUIDS().Count > 0)
                     {
@@ -323,7 +322,7 @@ namespace BruteScalp
             HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
 
             var task = Task.Run(async () => await haasonlineClient.CustomBotApi.SetupScalpingBot(BaseBotTemplateGuid, "BruteScalpe-Template", ConfigManager.mainConfig.AccountGUID, market,
-                maincoin, "", 0, 1000, ConfigManager.mainConfig.Fee, maincoin, "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage));
+                maincoin, "", 0, EnumBotTradeAmount.Static, 1000, ConfigManager.mainConfig.Fee, maincoin, "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage));
 
             task.Wait();
                         
@@ -396,7 +395,7 @@ namespace BruteScalp
             createBot.Wait();
 
             var setupScalpBotComplete = haasonlineClient.CustomBotApi.SetupScalpingBot(createBot.Result.Result.GUID, botName, 
-                ConfigManager.mainConfig.AccountGUID, market, maincoin,  "", 0, 1000, ConfigManager.mainConfig.Fee, maincoin,
+                ConfigManager.mainConfig.AccountGUID, market, maincoin,  "", 0, EnumBotTradeAmount.Static, 1000, ConfigManager.mainConfig.Fee, maincoin,
                 "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage);
 
             setupScalpBotComplete.Wait();
@@ -415,7 +414,7 @@ namespace BruteScalp
             createBot.Wait();
 
             var setupScalpBotComplete = Task.Run(async () => await haasonlineClient.CustomBotApi.SetupScalpingBot(createBot.Result.Result.GUID, botName,
-                ConfigManager.mainConfig.AccountGUID, market, maincoin, "", 0, amount, ConfigManager.mainConfig.Fee, maincoin,
+                ConfigManager.mainConfig.AccountGUID, market, maincoin, "", 0, EnumBotTradeAmount.Static, amount, ConfigManager.mainConfig.Fee, maincoin,
                 "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage));
 
             setupScalpBotComplete.Wait();
@@ -431,7 +430,7 @@ namespace BruteScalp
             HaasonlineClient haasonlineClient = new HaasonlineClient(ConfigManager.mainConfig.IPAddress, ConfigManager.mainConfig.Port, ConfigManager.mainConfig.Secret);
 
             var task = Task.Run(async () => await haasonlineClient.CustomBotApi.SetupScalpingBot(guid, botName, ConfigManager.mainConfig.AccountGUID, primaryCurrency,
-                secondaryCurrency, "", 0, amount, ConfigManager.mainConfig.Fee, position, "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage));
+                secondaryCurrency, "", 0, EnumBotTradeAmount.Static , amount, ConfigManager.mainConfig.Fee, position, "LOCKEDLIMITORDERGUID", targetPercentage, safetyPercentage));
 
             task.Wait();
 
